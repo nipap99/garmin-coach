@@ -215,4 +215,4 @@ The AI coach offers **advisory** suggestions based on your data — it is not a 
 
 ## License
 
-No license file is included yet. If you want others to freely use and build on this, consider adding an [MIT License](https://choosealicense.com/licenses/mit/). Until a license is added, default copyright applies (all rights reserved).
+Released under the [MIT License](LICENSE) — free to use, modify, and distribute. See the `LICENSE` file for details.
