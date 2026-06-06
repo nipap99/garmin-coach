@@ -5,244 +5,813 @@
   <title>Garmin Coach</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <style>
+    /* ── Tokens ─────────────────────────────────────────────────────────── */
     :root {
-      --bg: #0f1115;
-      --panel: #161a22;
-      --border: #262b36;
-      --text: #e6e8eb;
-      --muted: #98a2b3;
-      --accent: #4f8cff;
-      --success: #1f8a4c;
-      --error: #b53b3b;
-      --danger: #b53b3b;
+      --bg:      #0f1115;
+      --panel:   #161a22;
+      --border:  #262b36;
+      --text:    #e6e8eb;
+      --muted:   #98a2b3;
+      --accent:  #4f8cff;
+      --green:   #1f8a4c;
+      --red:     #b53b3b;
+      --orange:  #d97706;
+      --purple:  #7c3aed;
+      --radius:  8px;
     }
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      margin: 0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
+      padding-bottom: 0;
     }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
     header {
-      padding: 1.5rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--panel);
       border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
       display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-    }
-    header h1 { margin: 0; font-size: 1.4rem; font-weight: 600; }
-    header .sub { color: var(--muted); font-size: 0.9rem; }
-    main { padding: 2rem; max-width: 1100px; margin: 0 auto; }
-    section { margin-bottom: 2.5rem; }
-    section h2 {
-      margin: 0 0 1rem;
-      font-size: 1.05rem;
-      font-weight: 600;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-    }
-    .toolbar {
-      display: flex;
-      gap: 0.75rem;
       align-items: center;
-      margin-bottom: 1.25rem;
-      flex-wrap: wrap;
+      gap: 2rem;
+      height: 56px;
     }
-    button, .btn {
-      background: var(--accent);
-      color: white;
-      border: 0;
-      padding: 0.6rem 1.1rem;
-      border-radius: 6px;
-      font-size: 0.95rem;
+    .logo { font-size: 1.05rem; font-weight: 700; white-space: nowrap; }
+    .logo span { color: var(--accent); }
+
+    /* Desktop tabs */
+    .desktop-tabs { display: flex; gap: 2px; }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--muted);
+      padding: 0.45rem 0.9rem;
+      border-radius: var(--radius);
+      font-size: 0.88rem;
+      font-weight: 500;
       cursor: pointer;
+      transition: color 0.15s, background 0.15s;
     }
-    .btn-small { padding: 0.35rem 0.7rem; font-size: 0.85rem; }
-    .btn-danger { background: var(--danger); }
-    button:disabled { opacity: 0.6; cursor: progress; }
-    button:hover:not(:disabled) { filter: brightness(1.1); }
+    .tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+    .tab-btn.active { color: var(--accent); background: rgba(79,140,255,0.12); }
+
+    /* ── Main layout ─────────────────────────────────────────────────────── */
+    main { max-width: 1200px; margin: 0 auto; padding: 1.75rem 1.5rem; }
+    .tab-panel { display: block; }
+    .tab-panel[hidden] { display: none; }
+
+    /* ── Buttons ─────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.55rem 1rem;
+      border-radius: var(--radius);
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      transition: filter 0.15s;
+    }
+    .btn:hover:not(:disabled) { filter: brightness(1.12); }
+    .btn:disabled { opacity: 0.5; cursor: progress; }
+    .btn-small { padding: 0.35rem 0.7rem; font-size: 0.82rem; }
+    .btn-danger  { background: var(--red); }
+    .btn-success { background: var(--green); }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .btn-outline:hover:not(:disabled) { background: rgba(255,255,255,0.05); filter: none; }
+    .btn-ghost   { background: transparent; color: var(--muted); }
+    .btn-ghost:hover:not(:disabled)   { color: var(--text); background: rgba(255,255,255,0.04); filter: none; }
+
+    /* ── Forms ───────────────────────────────────────────────────────────── */
     select, input[type="text"], input[type="date"], textarea {
       background: var(--panel);
       color: var(--text);
       border: 1px solid var(--border);
-      padding: 0.55rem 0.7rem;
-      border-radius: 6px;
-      font-size: 0.9rem;
+      padding: 0.5rem 0.7rem;
+      border-radius: var(--radius);
+      font-size: 0.88rem;
       font-family: inherit;
+      outline: none;
     }
-    input[type="text"], input[type="date"] { min-width: 130px; }
-    label { color: var(--muted); font-size: 0.9rem; }
+    select:focus, input:focus, textarea:focus { border-color: var(--accent); }
+    label { color: var(--muted); font-size: 0.82rem; }
+    .field { display: flex; flex-direction: column; gap: 0.25rem; }
+
+    /* ── Panel / card base ───────────────────────────────────────────────── */
     .panel {
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: var(--radius);
       padding: 1rem;
-      min-height: 120px;
+      min-height: 80px;
     }
-    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
-    th, td {
-      padding: 0.55rem 0.75rem;
-      text-align: left;
-      border-bottom: 1px solid var(--border);
-    }
-    th { color: var(--muted); font-weight: 500; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; }
-    tbody tr:hover { background: rgba(255,255,255,0.03); }
-    .empty { color: var(--muted); padding: 1.5rem; text-align: center; }
+    .empty { color: var(--muted); padding: 2rem; text-align: center; }
     .banner {
-      padding: 0.7rem 1rem;
-      border-radius: 6px;
-      margin-bottom: 1rem;
-      font-size: 0.92rem;
+      padding: 0.65rem 1rem;
+      border-radius: var(--radius);
+      margin-bottom: 0.9rem;
+      font-size: 0.88rem;
     }
-    .banner.success { background: rgba(31,138,76,0.15); color: #7ad9a4; border: 1px solid rgba(31,138,76,0.35); }
-    .banner.error   { background: rgba(181,59,59,0.15);  color: #ff9a9a; border: 1px solid rgba(181,59,59,0.35); }
-    .htmx-request button { opacity: 0.6; cursor: progress; }
+    .banner.success { background: rgba(31,138,76,0.12); color: #7ad9a4; border: 1px solid rgba(31,138,76,0.3); }
+    .banner.error   { background: rgba(181,59,59,0.12); color: #ff9a9a; border: 1px solid rgba(181,59,59,0.3); }
 
-    /* Goals */
-    .goal-form {
+    .section-heading {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 0.9rem;
+    }
+    .toolbar {
       display: flex;
       gap: 0.6rem;
+      align-items: center;
       flex-wrap: wrap;
-      align-items: flex-end;
       margin-bottom: 1rem;
     }
-    .goal-form .field { display: flex; flex-direction: column; gap: 0.25rem; }
-    .goal-form .field label { font-size: 0.78rem; }
-    .goal-list { display: flex; flex-direction: column; gap: 0.6rem; }
+
+    /* ── Spinner ─────────────────────────────────────────────────────────── */
+    #plan-spinner { display: none; }
+    #plan-spinner.htmx-request {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+    .spinner-ring {
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .htmx-request .btn { opacity: 0.55; cursor: progress; }
+
+    /* ── Dashboard: stat cards ────────────────────────────────────────────── */
+    .stat-cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.9rem;
+      margin-bottom: 1.25rem;
+    }
+    .stat-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.25rem;
+    }
+    .stat-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      margin-bottom: 0.35rem;
+    }
+    .stat-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* ── Dashboard: charts ───────────────────────────────────────────────── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.9rem;
+    }
+    .chart-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.25rem;
+    }
+    .chart-card h3 {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 1rem;
+    }
+    .chart-card canvas { max-height: 220px; }
+
+    /* ── PR cards ────────────────────────────────────────────────────────── */
+    .pr-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
+    .pr-card {
+      background: rgba(255,255,255,0.025);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.85rem;
+    }
+    .pr-distance { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .pr-time { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin: 0.2rem 0; }
+    .pr-pace { font-size: 0.78rem; color: var(--muted); }
+    .pr-date { font-size: 0.72rem; color: var(--muted); margin-top: 0.2rem; }
+
+    /* ── Activities table ────────────────────────────────────────────────── */
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; white-space: nowrap; }
+    th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 500; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    tbody tr:hover { background: rgba(255,255,255,0.025); }
+
+    /* ── Goals ────────────────────────────────────────────────────────────── */
+    .goal-form { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1rem; }
+    .goal-list { display: flex; flex-direction: column; gap: 0.5rem; }
     .goal-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
       padding: 0.7rem 1rem;
       background: rgba(255,255,255,0.02);
       border: 1px solid var(--border);
-      border-radius: 6px;
+      border-radius: var(--radius);
     }
-    .goal-meta { color: var(--muted); font-size: 0.85rem; margin-left: 0.4rem; }
-    .goal-notes { color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }
+    .goal-meta { color: var(--muted); font-size: 0.82rem; margin-left: 0.35rem; }
+    .goal-notes { color: var(--muted); font-size: 0.82rem; margin-top: 0.2rem; }
 
-    /* Chat */
-    #chat-history { max-height: 480px; overflow-y: auto; display: flex; flex-direction: column; gap: 0.7rem; }
-    .msg { padding: 0.7rem 0.9rem; border-radius: 8px; line-height: 1.5; }
-    .msg-role { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.3rem; }
-    .msg-body { font-size: 0.95rem; }
-    .msg-user { background: rgba(79,140,255,0.08); border: 1px solid rgba(79,140,255,0.25); align-self: flex-end; max-width: 80%; }
-    .msg-assistant { background: rgba(255,255,255,0.03); border: 1px solid var(--border); align-self: flex-start; max-width: 90%; }
-    .chat-form { display: flex; gap: 0.6rem; margin-top: 0.8rem; align-items: flex-end; }
-    .chat-form textarea {
-      flex: 1; min-height: 60px; resize: vertical;
-      background: var(--panel); color: var(--text);
-      border: 1px solid var(--border); border-radius: 6px;
-      padding: 0.6rem; font-size: 0.95rem; font-family: inherit;
+    /* ── Chat ─────────────────────────────────────────────────────────────── */
+    #chat-history {
+      max-height: 460px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      padding: 1rem;
     }
-    .thinking-indicator { color: var(--muted); font-style: italic; padding: 0.5rem; }
+    .msg { padding: 0.65rem 0.9rem; border-radius: var(--radius); line-height: 1.55; }
+    .msg-role { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.25rem; }
+    .msg-body { font-size: 0.92rem; white-space: pre-wrap; }
+    .msg-user      { background: rgba(79,140,255,0.08); border: 1px solid rgba(79,140,255,0.22); align-self: flex-end; max-width: 82%; }
+    .msg-assistant { background: rgba(255,255,255,0.03); border: 1px solid var(--border); align-self: flex-start; max-width: 92%; }
+    .chat-form { display: flex; gap: 0.6rem; margin-top: 0.75rem; align-items: flex-end; }
+    .chat-form textarea {
+      flex: 1; min-height: 58px; resize: vertical;
+      background: var(--panel); color: var(--text);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 0.55rem 0.7rem; font-size: 0.92rem; font-family: inherit;
+    }
+
+    /* ── Training plan cards ─────────────────────────────────────────────── */
+    .plan-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .plan-card.plan-accepted { border-color: rgba(31,138,76,0.45); }
+    .plan-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 0.9rem;
+      margin-bottom: 1.1rem;
+    }
+    .plan-week   { font-size: 1.05rem; font-weight: 700; }
+    .plan-summary{ color: var(--muted); font-size: 0.88rem; margin-top: 0.25rem; }
+    .plan-total  { color: var(--accent); font-size: 0.82rem; font-weight: 600; margin-top: 0.25rem; }
+    .plan-actions{ display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+    .status-badge {
+      display: inline-block;
+      padding: 0.28rem 0.7rem;
+      border-radius: 20px;
+      font-size: 0.76rem;
+      font-weight: 600;
+    }
+    .status-proposed { background: rgba(79,140,255,0.12); color: var(--accent); }
+    .status-accepted { background: rgba(31,138,76,0.15); color: #7ad9a4; }
+
+    /* 7-day grid */
+    .days-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 0.55rem;
+    }
+    .day-card {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.8rem 0.75rem;
+      min-width: 0;
+    }
+    .day-header { display: flex; flex-direction: column; margin-bottom: 0.45rem; }
+    .day-name { font-weight: 600; font-size: 0.82rem; }
+    .day-date { font-size: 0.7rem; color: var(--muted); }
+    .workout-badge {
+      display: inline-block;
+      padding: 0.18rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      margin-bottom: 0.45rem;
+    }
+    .day-title { font-weight: 600; font-size: 0.82rem; margin-bottom: 0.3rem; }
+    .day-desc  { color: var(--muted); font-size: 0.76rem; line-height: 1.4; }
+    .day-meta  { color: var(--accent); font-size: 0.74rem; font-weight: 600; margin-top: 0.35rem; }
+
+    /* ── Mobile nav ──────────────────────────────────────────────────────── */
+    .mobile-nav { display: none; }
+
+    /* ── Responsive ──────────────────────────────────────────────────────── */
+    @media (max-width: 1050px) {
+      .days-grid { grid-template-columns: repeat(4, 1fr); }
+    }
+    @media (max-width: 767px) {
+      /* Show mobile nav, hide desktop tabs */
+      .desktop-tabs { display: none; }
+      .mobile-nav {
+        display: flex;
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        background: var(--panel);
+        border-top: 1px solid var(--border);
+        z-index: 100;
+        justify-content: space-around;
+        padding: 0.3rem 0 0.5rem;
+      }
+      .mobile-tab {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: none;
+        border: none;
+        color: var(--muted);
+        padding: 0.35rem 0.6rem;
+        font-size: 0.65rem;
+        font-weight: 500;
+        cursor: pointer;
+        min-width: 52px;
+        border-radius: var(--radius);
+        transition: color 0.15s;
+      }
+      .mobile-tab.active { color: var(--accent); }
+      .mobile-icon { font-size: 1.2rem; line-height: 1.2; margin-bottom: 0.15rem; }
+
+      body { padding-bottom: 72px; }
+      main { padding: 1rem; }
+      header { padding: 0 1rem; gap: 1rem; }
+
+      /* Stat cards: 2x2 */
+      .stat-cards { grid-template-columns: repeat(2, 1fr); }
+      /* Charts: single column */
+      .charts-grid { grid-template-columns: 1fr; }
+      /* Days grid: 2 columns */
+      .days-grid { grid-template-columns: repeat(2, 1fr); }
+      /* Goal form stacks */
+      .goal-form { flex-direction: column; align-items: stretch; }
+      /* Chat form stacks */
+      .chat-form { flex-direction: column; }
+      .chat-form .btn { align-self: flex-end; }
+      /* Plan actions wrap */
+      .plan-header { flex-direction: column; }
+    }
+    @media (max-width: 480px) {
+      .stat-value { font-size: 1.4rem; }
+      .days-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Garmin Coach</h1>
-    <span class="sub">local · running · v0.1</span>
-  </header>
 
-  <main>
-    <section>
-      <h2>Activities</h2>
-      <div class="toolbar">
-        <button hx-post="/sync" hx-target="#activities-panel" hx-include="[name='days']" hx-indicator="this">
-          Sync from Garmin
-        </button>
-        <label for="days">Last</label>
-        <select name="days" id="days" hx-get="/activities" hx-target="#activities-panel" hx-trigger="change">
-          <option value="7">7 days</option>
-          <option value="30" selected>30 days</option>
-          <option value="90">90 days</option>
-          <option value="365">365 days</option>
-        </select>
-        <form hx-post="/import/csv"
-              hx-target="#activities-panel"
-              hx-encoding="multipart/form-data"
-              style="display: inline-flex; gap: 0.5rem; align-items: center;">
-          <label for="csv-file" style="cursor: pointer; padding: 0.4rem 0.7rem; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;">
-            Choose CSV…
-          </label>
-          <input id="csv-file" type="file" name="file" accept=".csv" required style="display: none;"
-                 onchange="this.form.querySelector('button').disabled = !this.files.length; document.getElementById('csv-filename').textContent = this.files[0] ? this.files[0].name : '';">
-          <span id="csv-filename" style="color: var(--muted); font-size: 0.85rem;"></span>
-          <button type="submit" disabled>Import</button>
-        </form>
+<!-- ── Header ──────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">&#127939; Garmin <span>Coach</span></div>
+  <nav class="desktop-tabs">
+    <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+    <button class="tab-btn" data-tab="activities">Activities</button>
+    <button class="tab-btn" data-tab="plan">Training Plan</button>
+    <button class="tab-btn" data-tab="goals">Goals</button>
+    <button class="tab-btn" data-tab="coach">Coach</button>
+  </nav>
+</header>
+
+<!-- ── Main ────────────────────────────────────────────────────────────── -->
+<main>
+
+  <!-- ── Dashboard ──────────────────────────────────────────────────────── -->
+  <div id="panel-dashboard" class="tab-panel">
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-value" id="stat-runs">—</div>
+        <div class="stat-label">Total Runs</div>
       </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-km">—</div>
+        <div class="stat-label">Total Distance</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-month">—</div>
+        <div class="stat-label">This Month</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="stat-week">—</div>
+        <div class="stat-label">This Week</div>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Weekly Mileage</h3>
+        <canvas id="chart-mileage"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Pace Trend <span style="font-weight:400;text-transform:none;letter-spacing:0">(lower = faster)</span></h3>
+        <canvas id="chart-pace"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>VO2max Trend</h3>
+        <canvas id="chart-vo2max"></canvas>
+        <div id="vo2max-empty" class="empty" style="display:none;padding:0.5rem">
+          No VO2max data — requires Garmin sync (not available in CSV exports)
+        </div>
+      </div>
+      <div class="chart-card">
+        <h3>Personal Records</h3>
+        <div id="pr-cards"><div class="empty" style="padding:0.5rem">Loading…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Activities ─────────────────────────────────────────────────────── -->
+  <div id="panel-activities" class="tab-panel" hidden>
+    <div class="toolbar">
+      <button class="btn"
+              hx-post="/sync"
+              hx-target="#activities-panel"
+              hx-include="[name='days']"
+              hx-indicator="this">
+        Sync from Garmin
+      </button>
+      <label for="days">Last</label>
+      <select name="days" id="days"
+              hx-get="/activities"
+              hx-target="#activities-panel"
+              hx-trigger="change">
+        <option value="7">7 days</option>
+        <option value="30" selected>30 days</option>
+        <option value="90">90 days</option>
+        <option value="365">1 year</option>
+      </select>
+      <form hx-post="/import/csv"
+            hx-target="#activities-panel"
+            hx-encoding="multipart/form-data"
+            style="display:inline-flex;gap:0.5rem;align-items:center">
+        <label for="csv-file"
+               style="cursor:pointer;padding:0.45rem 0.8rem;background:var(--panel);
+                      border:1px solid var(--border);border-radius:var(--radius);font-size:0.85rem">
+          Choose CSV…
+        </label>
+        <input id="csv-file" type="file" name="file" accept=".csv" required style="display:none"
+               onchange="this.form.querySelector('button').disabled=!this.files.length;
+                         document.getElementById('csv-filename').textContent=this.files[0]?this.files[0].name:''">
+        <span id="csv-filename" style="color:var(--muted);font-size:0.82rem"></span>
+        <button class="btn" type="submit" disabled>Import</button>
+      </form>
+    </div>
+    <div class="table-scroll">
       <div id="activities-panel"
            class="panel"
            hx-get="/activities?days=30"
            hx-trigger="load">
         <div class="empty">Loading…</div>
       </div>
-    </section>
+    </div>
+  </div>
 
-    <section>
-      <h2>Goals</h2>
-      <form class="goal-form"
-            hx-post="/goals"
-            hx-target="#goals-panel"
-            hx-on::after-request="this.reset()">
-        <div class="field">
-          <label for="distance">Distance</label>
-          <select name="distance" id="distance" required>
-            <option value="5k">5K</option>
-            <option value="10k">10K</option>
-            <option value="half_marathon">Half marathon</option>
-            <option value="marathon">Marathon</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="target_time">Target time</label>
-          <input type="text" name="target_time" id="target_time" placeholder="e.g. 24:30 or 1:45:00" />
-        </div>
-        <div class="field">
-          <label for="target_date">Target date (optional)</label>
-          <input type="date" name="target_date" id="target_date" />
-        </div>
-        <div class="field" style="flex: 1; min-width: 200px;">
-          <label for="notes">Notes (optional)</label>
-          <input type="text" name="notes" id="notes" placeholder="e.g. spring race in Athens" />
-        </div>
-        <button type="submit">Add goal</button>
-      </form>
-      <div id="goals-panel"
-           class="panel"
-           hx-get="/goals"
-           hx-trigger="load">
-        <div class="empty">Loading…</div>
+  <!-- ── Training Plan ──────────────────────────────────────────────────── -->
+  <div id="panel-plan" class="tab-panel" hidden>
+    <div class="toolbar" style="margin-bottom:1.25rem">
+      <button class="btn"
+              hx-post="/plans/generate"
+              hx-target="#plans-panel"
+              hx-indicator="#plan-spinner">
+        &#10024; Generate My Week
+      </button>
+      <div id="plan-spinner">
+        <span class="spinner-ring"></span>
+        Generating your plan… this takes ~20 seconds
       </div>
-    </section>
+    </div>
+    <div id="plans-panel"
+         hx-get="/plans"
+         hx-trigger="load">
+      <div class="empty">Loading…</div>
+    </div>
+  </div>
 
-    <section>
-      <h2>Coach</h2>
-      <div id="chat-history"
-           class="panel"
-           hx-get="/chat/history"
-           hx-trigger="load">
-        <div class="empty">Loading…</div>
+  <!-- ── Goals ──────────────────────────────────────────────────────────── -->
+  <div id="panel-goals" class="tab-panel" hidden>
+    <form class="goal-form"
+          hx-post="/goals"
+          hx-target="#goals-panel"
+          hx-on::after-request="this.reset()">
+      <div class="field">
+        <label>Distance</label>
+        <select name="distance" required>
+          <option value="5k">5K</option>
+          <option value="10k">10K</option>
+          <option value="half_marathon">Half Marathon</option>
+          <option value="marathon">Marathon</option>
+        </select>
       </div>
-      <form class="chat-form"
-            hx-post="/chat"
-            hx-target="#chat-history"
-            hx-swap="beforeend scroll:bottom"
-            hx-disabled-elt="find button, find textarea"
-            hx-on::after-request="this.reset(); document.getElementById('chat-history').scrollTop = document.getElementById('chat-history').scrollHeight;">
-        <textarea name="message" placeholder="Ask the coach about your training, or request a weekly plan..." required></textarea>
-        <button type="submit">Send</button>
-      </form>
-      <div style="margin-top: 0.5rem;">
-        <button class="btn-small btn-danger"
-                hx-post="/chat/clear"
-                hx-target="#chat-history"
-                hx-confirm="Clear all chat history?">Clear chat</button>
+      <div class="field">
+        <label>Target time</label>
+        <input type="text" name="target_time" placeholder="e.g. 24:30 or 1:45:00" />
       </div>
-    </section>
-  </main>
+      <div class="field">
+        <label>Target date (optional)</label>
+        <input type="date" name="target_date" />
+      </div>
+      <div class="field" style="flex:1;min-width:180px">
+        <label>Notes (optional)</label>
+        <input type="text" name="notes" placeholder="e.g. spring race in Athens" />
+      </div>
+      <button class="btn" type="submit" style="align-self:flex-end">Add goal</button>
+    </form>
+    <div id="goals-panel"
+         class="panel"
+         hx-get="/goals"
+         hx-trigger="load">
+      <div class="empty">Loading…</div>
+    </div>
+  </div>
+
+  <!-- ── Coach ──────────────────────────────────────────────────────────── -->
+  <div id="panel-coach" class="tab-panel" hidden>
+    <div id="chat-history"
+         class="panel"
+         hx-get="/chat/history"
+         hx-trigger="load">
+      <div class="empty">Loading…</div>
+    </div>
+    <form class="chat-form"
+          hx-post="/chat"
+          hx-target="#chat-history"
+          hx-swap="beforeend scroll:bottom"
+          hx-disabled-elt="find button, find textarea"
+          hx-on::after-request="this.reset();
+            document.getElementById('chat-history').scrollTop=99999">
+      <textarea name="message"
+                placeholder="Ask about your training, request a weekly plan, check your pace trends…"
+                required></textarea>
+      <button class="btn" type="submit">Send</button>
+    </form>
+    <div style="margin-top:0.5rem">
+      <button class="btn btn-small btn-danger"
+              hx-post="/chat/clear"
+              hx-target="#chat-history"
+              hx-confirm="Clear all chat history?">Clear chat</button>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── Mobile bottom nav ───────────────────────────────────────────────── -->
+<nav class="mobile-nav">
+  <button class="mobile-tab active" data-tab="dashboard">
+    <span class="mobile-icon">&#128202;</span>
+    <span>Dashboard</span>
+  </button>
+  <button class="mobile-tab" data-tab="activities">
+    <span class="mobile-icon">&#127939;</span>
+    <span>Activities</span>
+  </button>
+  <button class="mobile-tab" data-tab="plan">
+    <span class="mobile-icon">&#128197;</span>
+    <span>Plan</span>
+  </button>
+  <button class="mobile-tab" data-tab="goals">
+    <span class="mobile-icon">&#127919;</span>
+    <span>Goals</span>
+  </button>
+  <button class="mobile-tab" data-tab="coach">
+    <span class="mobile-icon">&#128172;</span>
+    <span>Coach</span>
+  </button>
+</nav>
+
+<script>
+// ── Tab switching ──────────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(el => el.hidden = true);
+  document.querySelectorAll('[data-tab]').forEach(el => el.classList.remove('active'));
+  document.getElementById('panel-' + name).hidden = false;
+  document.querySelectorAll('[data-tab="' + name + '"]').forEach(el => el.classList.add('active'));
+  if (name === 'dashboard') initDashboard();
+}
+
+document.querySelectorAll('[data-tab]').forEach(btn => {
+  btn.addEventListener('click', () => showTab(btn.dataset.tab));
+});
+
+// ── Chart helpers ──────────────────────────────────────────────────────────
+function fmtPace(dec) {
+  if (!dec) return '—';
+  const m = Math.floor(dec), s = Math.round((dec - m) * 60);
+  return m + ':' + String(s === 60 ? (m + 1) + ':00' : (s < 10 ? '0' + s : s));
+}
+function fmtWeek(dateStr) {
+  // "2026-06-02" → "Jun 2"
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
+}
+
+const CHART_BASE = {
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      backgroundColor: '#1e2330',
+      titleColor: '#e6e8eb',
+      bodyColor: '#98a2b3',
+      borderColor: '#262b36',
+      borderWidth: 1,
+      padding: 10,
+    },
+  },
+  scales: {
+    x: {
+      ticks: { color: '#98a2b3', font: { size: 10 }, maxTicksLimit: 8 },
+      grid:  { color: 'rgba(255,255,255,0.04)' },
+    },
+    y: {
+      ticks: { color: '#98a2b3', font: { size: 10 } },
+      grid:  { color: 'rgba(255,255,255,0.04)' },
+    },
+  },
+};
+
+// ── Dashboard init (runs once) ─────────────────────────────────────────────
+let dashReady = false;
+
+async function initDashboard() {
+  if (dashReady) return;
+  dashReady = true;
+
+  try {
+    const [summary, mileage, pace, vo2max, prs] = await Promise.all([
+      fetch('/stats/summary').then(r => r.json()),
+      fetch('/stats/weekly-mileage').then(r => r.json()),
+      fetch('/stats/pace-trend').then(r => r.json()),
+      fetch('/stats/vo2max').then(r => r.json()),
+      fetch('/stats/prs').then(r => r.json()),
+    ]);
+
+    // Stat cards
+    document.getElementById('stat-runs').textContent  = (summary.total_runs || 0).toLocaleString();
+    document.getElementById('stat-km').textContent    = (summary.total_km   || 0) + ' km';
+    document.getElementById('stat-month').textContent = (summary.month_km   || 0) + ' km';
+    document.getElementById('stat-week').textContent  = (summary.week_km    || 0) + ' km';
+
+    // Weekly mileage bar chart
+    if (mileage.labels && mileage.labels.length) {
+      new Chart(document.getElementById('chart-mileage'), {
+        type: 'bar',
+        data: {
+          labels: mileage.labels.map(fmtWeek),
+          datasets: [{
+            data: mileage.values,
+            backgroundColor: 'rgba(79,140,255,0.45)',
+            borderColor: '#4f8cff',
+            borderWidth: 1,
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          ...CHART_BASE,
+          plugins: {
+            ...CHART_BASE.plugins,
+            tooltip: {
+              ...CHART_BASE.plugins.tooltip,
+              callbacks: {
+                label: ctx => ctx.raw + ' km (' + mileage.counts[ctx.dataIndex] + ' runs)',
+              },
+            },
+          },
+          scales: {
+            ...CHART_BASE.scales,
+            y: { ...CHART_BASE.scales.y, beginAtZero: true,
+                 ticks: { ...CHART_BASE.scales.y.ticks, callback: v => v + ' km' } },
+          },
+        },
+      });
+    }
+
+    // Pace trend line chart (Y axis inverted: lower pace = faster = visually higher)
+    if (pace.labels && pace.labels.length) {
+      new Chart(document.getElementById('chart-pace'), {
+        type: 'line',
+        data: {
+          labels: pace.labels,
+          datasets: [{
+            data: pace.values,
+            borderColor: '#1f8a4c',
+            backgroundColor: 'rgba(31,138,76,0.07)',
+            tension: 0.35,
+            fill: true,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            pointBackgroundColor: '#1f8a4c',
+          }],
+        },
+        options: {
+          ...CHART_BASE,
+          plugins: {
+            ...CHART_BASE.plugins,
+            tooltip: {
+              ...CHART_BASE.plugins.tooltip,
+              callbacks: {
+                label: ctx => fmtPace(ctx.raw) + '/km  |  ' + pace.distances[ctx.dataIndex] + ' km run',
+              },
+            },
+          },
+          scales: {
+            ...CHART_BASE.scales,
+            y: {
+              ...CHART_BASE.scales.y,
+              reverse: true,
+              ticks: { ...CHART_BASE.scales.y.ticks, callback: v => fmtPace(v) },
+            },
+          },
+        },
+      });
+    }
+
+    // VO2max trend
+    if (vo2max.labels && vo2max.labels.length) {
+      new Chart(document.getElementById('chart-vo2max'), {
+        type: 'line',
+        data: {
+          labels: vo2max.labels,
+          datasets: [{
+            data: vo2max.values,
+            borderColor: '#d97706',
+            backgroundColor: 'rgba(217,119,6,0.07)',
+            tension: 0.4,
+            fill: true,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointBackgroundColor: '#d97706',
+          }],
+        },
+        options: {
+          ...CHART_BASE,
+          plugins: {
+            ...CHART_BASE.plugins,
+            tooltip: {
+              ...CHART_BASE.plugins.tooltip,
+              callbacks: { label: ctx => 'VO2max: ' + ctx.raw },
+            },
+          },
+          scales: {
+            ...CHART_BASE.scales,
+            y: { ...CHART_BASE.scales.y, beginAtZero: false },
+          },
+        },
+      });
+    } else {
+      document.getElementById('chart-vo2max').style.display = 'none';
+      document.getElementById('vo2max-empty').style.display = 'block';
+    }
+
+    // PR cards
+    const PR_LABELS = { '5k': '5K', '10k': '10K', 'half_marathon': 'Half Marathon', 'marathon': 'Marathon' };
+    const prEl = document.getElementById('pr-cards');
+    const entries = Object.entries(prs);
+    if (entries.length) {
+      prEl.innerHTML = '<div class="pr-grid">' +
+        entries.map(([dist, d]) =>
+          '<div class="pr-card">' +
+          '<div class="pr-distance">' + (PR_LABELS[dist] || dist) + '</div>' +
+          '<div class="pr-time">'     + d.duration_formatted + '</div>' +
+          '<div class="pr-pace">'     + d.pace_formatted + '</div>' +
+          '<div class="pr-date">'     + d.date + '</div>' +
+          '</div>'
+        ).join('') + '</div>';
+    } else {
+      prEl.innerHTML = '<div class="empty" style="padding:0.5rem">No PR data yet — import more runs</div>';
+    }
+
+  } catch (err) {
+    console.error('Dashboard init error:', err);
+  }
+}
+
+// Start on dashboard
+document.addEventListener('DOMContentLoaded', () => showTab('dashboard'));
+</script>
 </body>
 </html>
