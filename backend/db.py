@@ -389,18 +389,21 @@ def get_pace_trend(limit: int = 30) -> list[dict[str, Any]]:
     return [dict(r) for r in reversed(rows)]
 
 
-def get_vo2max_trend() -> list[dict[str, Any]]:
-    """All activities with a recorded VO2max, oldest first."""
+def get_hr_trend(limit: int = 30) -> list[dict[str, Any]]:
+    """Last N runs (>=3 km) with a recorded avg HR, oldest first."""
     with get_connection() as conn:
         rows = conn.execute(
             """
-            SELECT start_local, vo2max
+            SELECT start_local, avg_hr, distance_km, avg_pace_min_per_km
             FROM activities
-            WHERE vo2max IS NOT NULL AND vo2max > 0
-            ORDER BY start_local ASC
+            WHERE avg_hr IS NOT NULL AND avg_hr > 0
+              AND distance_km >= 3
+            ORDER BY start_local DESC
+            LIMIT %s
             """,
+            (limit,),
         ).fetchall()
-    return [dict(r) for r in rows]
+    return [dict(r) for r in reversed(rows)]
 
 
 _PR_RANGES: dict[str, tuple[float, float]] = {

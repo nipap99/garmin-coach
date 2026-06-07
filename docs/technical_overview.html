@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Garmin Coach — Technical Documentation</title>
+<style>
+  /* ── Fonts & Reset ─────────────────────────────────────────────── */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #f8f9fb;
+    color: #1a1d27;
+    line-height: 1.7;
+    font-size: 15px;
+  }
+
+  /* ── Page layout ───────────────────────────────────────────────── */
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 2rem 4rem;
+  }
+
+  /* ── Cover ─────────────────────────────────────────────────────── */
+  .cover {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 5rem 3rem;
+    background: linear-gradient(135deg, #0f1117 0%, #1a1d27 50%, #1f2640 100%);
+    color: white;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: -100px; right: -100px;
+    width: 500px; height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(79,140,255,0.15) 0%, transparent 70%);
+  }
+  .cover-tag {
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #4f8cff;
+    margin-bottom: 1.5rem;
+  }
+  .cover h1 {
+    font-size: 3.2rem;
+    font-weight: 700;
+    line-height: 1.15;
+    margin-bottom: 1rem;
+    max-width: 600px;
+  }
+  .cover h1 span { color: #4f8cff; }
+  .cover-sub {
+    font-size: 1.1rem;
+    color: rgba(255,255,255,0.6);
+    max-width: 520px;
+    margin-bottom: 3rem;
+  }
+  .cover-meta {
+    display: flex;
+    gap: 2.5rem;
+    flex-wrap: wrap;
+  }
+  .cover-meta-item { display: flex; flex-direction: column; gap: 0.2rem; }
+  .cover-meta-label { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.4); }
+  .cover-meta-value { font-size: 0.95rem; font-weight: 500; color: rgba(255,255,255,0.85); }
+  .cover-badge-row { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 2.5rem; }
+  .badge {
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+  .badge-blue  { background: rgba(79,140,255,0.2);  color: #7fb3ff; border: 1px solid rgba(79,140,255,0.3); }
+  .badge-green { background: rgba(31,138,76,0.2);   color: #7ad9a4; border: 1px solid rgba(31,138,76,0.3); }
+  .badge-red   { background: rgba(224,82,82,0.2);   color: #ff9a9a; border: 1px solid rgba(224,82,82,0.3); }
+  .badge-purple{ background: rgba(155,89,182,0.2);  color: #c39bd3; border: 1px solid rgba(155,89,182,0.3);}
+  .badge-orange{ background: rgba(245,166,35,0.2);  color: #ffd580; border: 1px solid rgba(245,166,35,0.3);}
+
+  /* ── TOC ────────────────────────────────────────────────────────── */
+  .toc-section {
+    background: white;
+    border-radius: 16px;
+    padding: 2.5rem 3rem;
+    margin: 3rem 0;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.06);
+  }
+  .toc-section h2 { font-size: 1.1rem; color: #4f8cff; margin-bottom: 1.5rem; letter-spacing: 0.05em; text-transform: uppercase; }
+  .toc-list { list-style: none; }
+  .toc-list li { display: flex; align-items: baseline; gap: 0.5rem; padding: 0.35rem 0; border-bottom: 1px dashed #e8eaf0; }
+  .toc-list li:last-child { border-bottom: none; }
+  .toc-num { font-weight: 700; color: #4f8cff; min-width: 1.8rem; font-size: 0.85rem; }
+  .toc-title { font-size: 0.95rem; color: #1a1d27; }
+  .toc-dots { flex: 1; border-bottom: 2px dotted #dde1ea; margin: 0 0.5rem; height: 1em; }
+
+  /* ── Section ────────────────────────────────────────────────────── */
+  .section {
+    background: white;
+    border-radius: 16px;
+    padding: 2.5rem 3rem;
+    margin: 2rem 0;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.06);
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.8rem;
+    padding-bottom: 1.2rem;
+    border-bottom: 2px solid #f0f2f8;
+  }
+  .section-num {
+    width: 38px; height: 38px;
+    background: #4f8cff;
+    color: white;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+  }
+  .section-num.green  { background: #1f8a4c; }
+  .section-num.red    { background: #e05252; }
+  .section-num.purple { background: #9b59b6; }
+  .section-num.orange { background: #f5a623; }
+  .section-num.teal   { background: #17a2b8; }
+  .section-num.dark   { background: #2c3e50; }
+  .section-num.pink   { background: #e83e8c; }
+  .section-num.indigo { background: #6610f2; }
+
+  .section h2 { font-size: 1.45rem; font-weight: 700; color: #1a1d27; }
+  .section h3 { font-size: 1.05rem; font-weight: 600; color: #1a1d27; margin: 1.5rem 0 0.6rem; }
+  .section p  { color: #444; margin-bottom: 1rem; }
+  .section ul, .section ol { padding-left: 1.4rem; margin-bottom: 1rem; color: #444; }
+  .section li { margin-bottom: 0.35rem; }
+
+  /* ── Callout box ─────────────────────────────────────────────────── */
+  .callout {
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    margin: 1.2rem 0;
+    display: flex;
+    gap: 0.8rem;
+    align-items: flex-start;
+    font-size: 0.9rem;
+  }
+  .callout-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 0.05rem; }
+  .callout.blue  { background: #eff5ff; border-left: 4px solid #4f8cff; color: #2c4a8a; }
+  .callout.green { background: #edfbf3; border-left: 4px solid #1f8a4c; color: #1a5c35; }
+  .callout.orange{ background: #fff8ec; border-left: 4px solid #f5a623; color: #7a4f0a; }
+
+  /* ── Code blocks ─────────────────────────────────────────────────── */
+  .code-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #98a2b3;
+    margin-bottom: 0.4rem;
+    padding-left: 0.2rem;
+  }
+  pre {
+    background: #0f1117;
+    color: #e2e8f0;
+    border-radius: 10px;
+    padding: 1.3rem 1.5rem;
+    overflow-x: auto;
+    margin: 0.5rem 0 1.2rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    line-height: 1.65;
+    border: 1px solid #1e2334;
+  }
+  .kw  { color: #c792ea; }  /* keywords */
+  .fn  { color: #82aaff; }  /* functions */
+  .st  { color: #c3e88d; }  /* strings */
+  .cm  { color: #546e7a; font-style: italic; }  /* comments */
+  .nm  { color: #f78c6c; }  /* numbers */
+  .cl  { color: #ffcb6b; }  /* class names */
+  .op  { color: #89ddff; }  /* operators/punctuation */
+  .at  { color: #f07178; }  /* attributes/decorators */
+
+  /* ── Architecture diagram ────────────────────────────────────────── */
+  .arch {
+    background: #0f1117;
+    border-radius: 12px;
+    padding: 2rem;
+    margin: 1.2rem 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: #e2e8f0;
+    line-height: 1.8;
+  }
+  .arch-box {
+    border: 1px solid #2d3748;
+    border-radius: 8px;
+    padding: 0.8rem 1.2rem;
+    margin: 0.5rem 0;
+    background: #1a1d27;
+  }
+  .arch-title { color: #4f8cff; font-weight: 600; font-size: 0.85rem; margin-bottom: 0.4rem; }
+  .arch-row { display: flex; gap: 0.8rem; align-items: stretch; margin: 0.5rem 0; flex-wrap: wrap; }
+  .arch-row .arch-box { flex: 1; min-width: 120px; }
+  .arch-arrow { color: #4f8cff; text-align: center; font-size: 1.1rem; padding: 0.3rem 0; }
+  .arch-layer { margin-bottom: 0.3rem; }
+  .arch-label { color: #98a2b3; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 0.4rem; }
+  .arch .green { color: #7ad9a4; }
+  .arch .blue  { color: #82aaff; }
+  .arch .orange{ color: #ffd580; }
+  .arch .red   { color: #ff9a9a; }
+  .arch .purple{ color: #c39bd3; }
+  .arch .muted { color: #546e7a; }
+
+  /* ── Tables ──────────────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.5rem; font-size: 0.88rem; }
+  th { background: #f0f3fa; color: #444; font-weight: 600; padding: 0.65rem 1rem; text-align: left; border-bottom: 2px solid #dde1ea; }
+  td { padding: 0.6rem 1rem; border-bottom: 1px solid #eef0f6; color: #555; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #fafbff; }
+  td code, th code {
+    background: #f0f3fa;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: #4f8cff;
+  }
+
+  /* ── Flow diagram ────────────────────────────────────────────────── */
+  .flow { margin: 1.2rem 0; }
+  .flow-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 0;
+  }
+  .flow-left { display: flex; flex-direction: column; align-items: center; }
+  .flow-dot {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: #4f8cff;
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .flow-dot.green  { background: #1f8a4c; }
+  .flow-dot.orange { background: #f5a623; }
+  .flow-dot.red    { background: #e05252; }
+  .flow-dot.purple { background: #9b59b6; }
+  .flow-dot.teal   { background: #17a2b8; }
+  .flow-line {
+    width: 2px;
+    flex: 1;
+    background: #dde1ea;
+    min-height: 24px;
+    margin: 2px 0;
+  }
+  .flow-content { padding: 0.15rem 0 1rem; }
+  .flow-content strong { display: block; font-size: 0.92rem; color: #1a1d27; margin-bottom: 0.2rem; }
+  .flow-content span { font-size: 0.85rem; color: #666; }
+  .flow-content code {
+    background: #f0f3fa;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: #4f8cff;
+  }
+
+  /* ── File tree ───────────────────────────────────────────────────── */
+  .file-tree {
+    background: #0f1117;
+    border-radius: 10px;
+    padding: 1.3rem 1.5rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    line-height: 1.9;
+    color: #e2e8f0;
+  }
+  .file-tree .dir  { color: #82aaff; font-weight: 600; }
+  .file-tree .file { color: #c3e88d; }
+  .file-tree .note { color: #546e7a; font-size: 0.75rem; }
+
+  /* ── Print ───────────────────────────────────────────────────────── */
+  @media print {
+    body { background: white; font-size: 13px; }
+    .cover { min-height: auto; padding: 3rem; page-break-after: always; }
+    .section { box-shadow: none; border: 1px solid #eee; page-break-inside: avoid; }
+    .toc-section { box-shadow: none; border: 1px solid #eee; page-break-after: always; }
+    pre { page-break-inside: avoid; font-size: 0.75rem; }
+    .arch { page-break-inside: avoid; }
+    h2 { page-break-after: avoid; }
+    h3 { page-break-after: avoid; }
+    .page { padding: 0 1rem 2rem; }
+  }
+
+  /* ── Separator ───────────────────────────────────────────────────── */
+  .sep { height: 1px; background: #eef0f6; margin: 0.5rem 0; }
+
+  /* ── Inline code ─────────────────────────────────────────────────── */
+  p code, li code {
+    background: #f0f3fa;
+    padding: 0.1rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    color: #4f8cff;
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     COVER PAGE
+════════════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-tag">Technical Documentation</div>
+  <h1>Garmin <span>Coach</span><br>App</h1>
+  <p class="cover-sub">
+    A local AI-powered running coach that ingests Garmin data, visualises
+    your training, and generates personalised weekly plans using the Claude API.
+  </p>
+  <div class="cover-meta">
+    <div class="cover-meta-item">
+      <span class="cover-meta-label">Author</span>
+      <span class="cover-meta-value">Nikanoras Papadopoulos</span>
+    </div>
+    <div class="cover-meta-item">
+      <span class="cover-meta-label">Date</span>
+      <span class="cover-meta-value">June 2026</span>
+    </div>
+    <div class="cover-meta-item">
+      <span class="cover-meta-label">Version</span>
+      <span class="cover-meta-value">1.0</span>
+    </div>
+  </div>
+  <div class="cover-badge-row">
+    <span class="badge badge-blue">Python · FastAPI</span>
+    <span class="badge badge-green">PostgreSQL</span>
+    <span class="badge badge-red">Claude AI</span>
+    <span class="badge badge-purple">Playwright</span>
+    <span class="badge badge-orange">Chart.js · HTMX</span>
+  </div>
+</div>
+
+<div class="page">
+
+<!-- ══════════════════════════════════════════════════════════════════
+     TABLE OF CONTENTS
+════════════════════════════════════════════════════════════════════ -->
+<div class="toc-section">
+  <h2>Contents</h2>
+  <ul class="toc-list">
+    <li><span class="toc-num">1</span><span class="toc-title">What the system does</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">2</span><span class="toc-title">Architecture overview</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">3</span><span class="toc-title">Backend — FastAPI</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">4</span><span class="toc-title">Database — PostgreSQL</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">5</span><span class="toc-title">CSV Importer</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">6</span><span class="toc-title">Playwright Sync (Browser Automation)</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">7</span><span class="toc-title">Claude AI Integration</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">8</span><span class="toc-title">Frontend — HTMX + Chart.js</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">9</span><span class="toc-title">Data flow — end to end</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">10</span><span class="toc-title">File reference</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">11</span><span class="toc-title">Technology choices</span><span class="toc-dots"></span></li>
+  </ul>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     1 — WHAT THE SYSTEM DOES
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num">1</div>
+    <h2>What the System Does</h2>
+  </div>
+
+  <p>
+    Garmin Coach is a <strong>local web application</strong> — it runs entirely on your own computer,
+    not on any cloud server. You open it in a browser at <code>localhost:8000</code>, but all data
+    stays on your machine.
+  </p>
+  <p>
+    In one sentence: it ingests your Garmin running data, stores it permanently, visualises
+    your training history, and uses the Claude AI to generate personalised weekly plans and
+    answer coaching questions.
+  </p>
+
+  <h3>Core capabilities</h3>
+  <ul>
+    <li><strong>Data ingestion</strong> — imports Garmin CSV exports (manual) or automates the export via a real Chrome browser (one-click sync)</li>
+    <li><strong>Deduplication</strong> — importing the same file twice never creates duplicate entries</li>
+    <li><strong>Dashboard</strong> — weekly mileage bar chart, pace trend, heart rate trend, personal records</li>
+    <li><strong>AI weekly plans</strong> — generates a structured 7-day training plan based on your actual stats and goals</li>
+    <li><strong>AI coaching chat</strong> — conversational interface with real-time context from your runs</li>
+    <li><strong>Goals tracking</strong> — CRUD interface for race targets and training goals</li>
+  </ul>
+
+  <div class="callout blue">
+    <span class="callout-icon">💡</span>
+    <div>
+      <strong>Why local?</strong> Garmin does not offer a public API for personal use.
+      Running locally means no cloud fees, no third-party data sharing, and no rate limits.
+      Your 859 runs and all AI responses stay on your machine.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     2 — ARCHITECTURE
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num green">2</div>
+    <h2>Architecture Overview</h2>
+  </div>
+
+  <p>
+    The application has three layers: a <strong>database</strong> at the bottom for permanent storage,
+    a <strong>Python backend</strong> in the middle that handles all logic, and a
+    <strong>browser UI</strong> at the top for interaction. Two external services are called
+    from the backend: Garmin Connect (via a controlled browser) and the Anthropic Claude API.
+  </p>
+
+  <div class="arch">
+    <div class="arch-label">USER INTERFACE (browser at localhost:8000)</div>
+    <div class="arch-box">
+      <div class="arch-title">frontend/index.html — Single Page Application</div>
+      <div class="arch-row">
+        <div class="arch-box" style="background:#0f1117">
+          <span class="blue">📊 Dashboard</span><br>
+          <span class="muted" style="font-size:0.72rem">Chart.js charts<br>4 stat cards</span>
+        </div>
+        <div class="arch-box" style="background:#0f1117">
+          <span class="blue">🏃 Activities</span><br>
+          <span class="muted" style="font-size:0.72rem">run table<br>CSV import</span>
+        </div>
+        <div class="arch-box" style="background:#0f1117">
+          <span class="blue">📅 Plan</span><br>
+          <span class="muted" style="font-size:0.72rem">weekly cards<br>generate/accept</span>
+        </div>
+        <div class="arch-box" style="background:#0f1117">
+          <span class="blue">🎯 Goals</span><br>
+          <span class="muted" style="font-size:0.72rem">race targets<br>CRUD</span>
+        </div>
+        <div class="arch-box" style="background:#0f1117">
+          <span class="blue">💬 Coach</span><br>
+          <span class="muted" style="font-size:0.72rem">streaming chat<br>AI responses</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="arch-arrow">↕ HTTP (HTMX fragments + JSON fetch)</div>
+
+    <div class="arch-label">BACKEND (Python / FastAPI)</div>
+    <div class="arch-box">
+      <div class="arch-title">backend/ — Route modules + business logic</div>
+      <div class="arch-row">
+        <div class="arch-box" style="background:#0f1117"><span class="green">activities.py</span><br><span class="muted" style="font-size:0.72rem">/sync /import /activities</span></div>
+        <div class="arch-box" style="background:#0f1117"><span class="green">stats.py</span><br><span class="muted" style="font-size:0.72rem">/stats/weekly-mileage etc.</span></div>
+        <div class="arch-box" style="background:#0f1117"><span class="green">plans.py</span><br><span class="muted" style="font-size:0.72rem">/plans/generate</span></div>
+        <div class="arch-box" style="background:#0f1117"><span class="green">chat.py</span><br><span class="muted" style="font-size:0.72rem">/chat (streaming)</span></div>
+      </div>
+      <div class="arch-row" style="margin-top:0.5rem">
+        <div class="arch-box" style="background:#0f1117; flex:2"><span class="orange">db.py</span> — all database functions (connection pool, upsert, queries)</div>
+        <div class="arch-box" style="background:#0f1117; flex:2"><span class="orange">csv_importer.py</span> — multi-locale Garmin CSV parser</div>
+        <div class="arch-box" style="background:#0f1117; flex:2"><span class="orange">garmin_playwright.py</span> — browser automation sync</div>
+      </div>
+    </div>
+
+    <div class="arch-arrow">↕ psycopg3 connection pool</div>
+
+    <div class="arch-label">DATA LAYER</div>
+    <div class="arch-row">
+      <div class="arch-box" style="flex:2">
+        <div class="arch-title">PostgreSQL Database</div>
+        <span class="green">activities</span> &nbsp;|&nbsp; <span class="green">goals</span> &nbsp;|&nbsp; <span class="green">weekly_plans</span>
+      </div>
+      <div class="arch-box" style="flex:1">
+        <div class="arch-title">Anthropic Claude API</div>
+        <span class="purple">claude-opus-4-7</span><br>
+        <span class="muted" style="font-size:0.72rem">plans · chat</span>
+      </div>
+      <div class="arch-box" style="flex:1">
+        <div class="arch-title">Garmin Connect</div>
+        <span class="red">Playwright Chrome</span><br>
+        <span class="muted" style="font-size:0.72rem">CSV export automation</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     3 — BACKEND
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num red">3</div>
+    <h2>Backend — FastAPI</h2>
+  </div>
+
+  <p>
+    <strong>FastAPI</strong> is the Python web framework that handles every HTTP request — from
+    serving the HTML page to answering chart data queries to running the Garmin sync.
+    It is chosen for its speed, automatic API documentation, and typed Python support.
+  </p>
+  <p>
+    The app is started with <code>uvicorn</code> (a lightweight async web server).
+    The <code>--reload</code> flag makes the server restart automatically when any
+    <code>.py</code> file changes — essential during development.
+  </p>
+
+  <div class="code-label">backend/main.py — entry point</div>
+  <pre><span class="kw">from</span> fastapi <span class="kw">import</span> FastAPI
+
+app = <span class="fn">FastAPI</span>(title=<span class="st">"Garmin Coach"</span>)
+
+<span class="cm"># Each router is a separate file of related endpoints.</span>
+<span class="cm"># This is called "separation of concerns" — each file has one job.</span>
+app.<span class="fn">include_router</span>(activities_routes.router)
+app.<span class="fn">include_router</span>(stats_routes.router)
+app.<span class="fn">include_router</span>(plans_routes.router)
+app.<span class="fn">include_router</span>(chat_routes.router)
+
+<span class="at">@app.get</span>(<span class="st">"/"</span>, response_class=HTMLResponse)
+<span class="kw">def</span> <span class="fn">index</span>():
+    <span class="cm"># Serve the single HTML file that is the entire UI</span>
+    <span class="kw">return</span> HTMLResponse(html_path.<span class="fn">read_text</span>())</pre>
+
+  <h3>Route modules</h3>
+  <table>
+    <tr><th>File</th><th>URL prefix</th><th>Responsibility</th></tr>
+    <tr><td><code>routes/activities.py</code></td><td><code>/activities</code>, <code>/sync</code>, <code>/import/csv</code></td><td>List runs, trigger Garmin browser sync, import CSV files</td></tr>
+    <tr><td><code>routes/stats.py</code></td><td><code>/stats/*</code></td><td>JSON data for all dashboard charts (weekly mileage, pace, HR, PRs)</td></tr>
+    <tr><td><code>routes/plans.py</code></td><td><code>/plans/*</code></td><td>Generate, accept, and archive AI weekly training plans</td></tr>
+    <tr><td><code>routes/goals.py</code></td><td><code>/goals/*</code></td><td>Create, read, update, delete race and training goals</td></tr>
+    <tr><td><code>routes/chat.py</code></td><td><code>/chat</code></td><td>Streaming AI coaching conversation with run context</td></tr>
+  </table>
+
+  <div class="callout orange">
+    <span class="callout-icon">⚙️</span>
+    <div>
+      <strong>Plain English:</strong> Think of each route file like a department in a company.
+      The stats department only knows about charts. The activities department only knows about
+      runs. They don't interfere with each other, which makes the code easy to maintain and extend.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     4 — DATABASE
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num purple">4</div>
+    <h2>Database — PostgreSQL</h2>
+  </div>
+
+  <p>
+    <strong>PostgreSQL</strong> is a production-grade relational database. We chose it over
+    simpler alternatives (like SQLite or a plain JSON file) for two reasons: it handles
+    concurrent reads/writes cleanly, and it supports <code>JSONB</code> — storing JSON
+    objects inside a table column, which we use for the raw Garmin data and weekly plans.
+  </p>
+
+  <h3>Connection pooling</h3>
+  <p>
+    Instead of opening and closing a database connection on every HTTP request (slow),
+    a <strong>connection pool</strong> keeps 2–10 connections permanently open and ready.
+    When the app needs the database it borrows one, uses it, and returns it.
+  </p>
+
+  <div class="code-label">backend/db.py — pool setup</div>
+  <pre><span class="cm"># min_size=2: always keep 2 connections open and ready.</span>
+<span class="cm"># max_size=10: never open more than 10 at once.</span>
+_pool = <span class="cl">ConnectionPool</span>(
+    conninfo=config.DATABASE_URL,
+    min_size=<span class="nm">2</span>,
+    max_size=<span class="nm">10</span>
+)</pre>
+
+  <h3>The three tables</h3>
+
+  <div class="code-label">SQL schema (simplified)</div>
+  <pre><span class="cm">-- Every run you have ever recorded.</span>
+<span class="kw">CREATE TABLE</span> <span class="cl">activities</span> (
+    id                  BIGINT <span class="kw">PRIMARY KEY</span>,
+    start_local         TEXT,          <span class="cm">-- "2026-06-04 07:32:00"</span>
+    start_minute        TEXT <span class="kw">UNIQUE</span>,  <span class="cm">-- deduplication key</span>
+    distance_km         NUMERIC,
+    duration_min        NUMERIC,
+    avg_pace_min_per_km NUMERIC,
+    avg_hr              INTEGER,
+    vo2max              NUMERIC,
+    raw_json            JSONB          <span class="cm">-- full original data preserved</span>
+);
+
+<span class="cm">-- Claude-generated weekly training plans.</span>
+<span class="kw">CREATE TABLE</span> <span class="cl">weekly_plans</span> (
+    id         BIGINT <span class="kw">PRIMARY KEY</span>,
+    week_start TEXT,
+    plan_json  JSONB,         <span class="cm">-- the full 7-day plan as JSON</span>
+    status     TEXT           <span class="cm">-- 'proposed' | 'accepted' | 'archived'</span>
+);
+
+<span class="cm">-- Your race targets and training goals.</span>
+<span class="kw">CREATE TABLE</span> <span class="cl">goals</span> (
+    id          BIGINT <span class="kw">PRIMARY KEY</span>,
+    description TEXT,
+    target_date TEXT,
+    status      TEXT
+);</pre>
+
+  <h3>Deduplication — the most important design decision</h3>
+  <p>
+    When you re-import the same CSV, or export a CSV that overlaps with a previous one,
+    the database must not create duplicate entries. We solve this with an <strong>upsert</strong>:
+  </p>
+
+  <div class="code-label">The upsert pattern</div>
+  <pre><span class="kw">INSERT INTO</span> activities (id, start_local, distance_km, ...)
+<span class="kw">VALUES</span> (...)
+<span class="kw">ON CONFLICT</span> (start_minute) <span class="kw">DO UPDATE SET</span>
+    distance_km = <span class="fn">COALESCE</span>(excluded.distance_km, activities.distance_km),
+    avg_hr      = <span class="fn">COALESCE</span>(excluded.avg_hr,      activities.avg_hr),
+    ...</pre>
+
+  <p>
+    <code>start_minute</code> is the run's start time truncated to the minute (e.g. <code>"2026-06-04 07:32"</code>).
+    Since two real runs can never start in the exact same minute, this is a reliable unique key.
+    If a conflict is detected, <code>COALESCE</code> keeps whichever value is not null — so a richer
+    earlier import (with HR data) is never overwritten by a sparser later one.
+  </p>
+
+  <div class="callout green">
+    <span class="callout-icon">✅</span>
+    <div>
+      <strong>Result:</strong> You imported 13 CSVs containing 4,540 total rows across overlapping
+      date ranges. The dedup system reduced those to 825 genuinely new runs — no duplicates,
+      no data loss.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     5 — CSV IMPORTER
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num orange">5</div>
+    <h2>CSV Importer</h2>
+  </div>
+
+  <p>
+    Garmin exports CSVs in different formats depending on your account language.
+    The importer auto-detects the locale and applies the right parser for each field.
+  </p>
+
+  <table>
+    <tr><th>Feature</th><th>English export</th><th>Greek export</th></tr>
+    <tr><td>Column delimiter</td><td><code>,</code></td><td><code>;</code></td></tr>
+    <tr><td>Decimal separator</td><td><code>4.5</code> km</td><td><code>4,5</code> km</td></tr>
+    <tr><td>Date format</td><td><code>2026-06-04 07:32:19</code></td><td><code>4/6/2026 7:32</code></td></tr>
+    <tr><td>Pace format</td><td><code>5:30</code> (MM:SS)</td><td><code>5:30:00 πμ</code> (Excel time-of-day)</td></tr>
+    <tr><td>Headers</td><td>English text</td><td>Greek Unicode characters</td></tr>
+  </table>
+
+  <div class="code-label">backend/csv_importer.py — locale detection</div>
+  <pre><span class="kw">def</span> <span class="fn">_is_greek_locale</span>(headers):
+    <span class="cm"># Check if any header contains a Greek Unicode character (range Ͱ–Ͽ)</span>
+    <span class="kw">return</span> <span class="fn">any</span>(
+        <span class="fn">any</span>(<span class="st">"Ͱ"</span> &lt;= ch &lt;= <span class="st">"Ͽ"</span> <span class="kw">for</span> ch <span class="kw">in</span> h) <span class="kw">for</span> h <span class="kw">in</span> headers
+    )
+
+<span class="kw">def</span> <span class="fn">_parse_duration_greek</span>(text):
+    <span class="cm"># Greek Garmin exports store pace as Excel time-of-day: "5:30:00 πμ"</span>
+    <span class="cm"># πμ = AM, μμ = PM. We strip the suffix and read only MM:SS.</span>
+    text = text.<span class="fn">replace</span>(<span class="st">" πμ"</span>, <span class="st">""</span>).<span class="fn">replace</span>(<span class="st">" μμ"</span>, <span class="st">""</span>)
+    parts = text.<span class="fn">split</span>(<span class="st">":"</span>)
+    <span class="kw">return</span> <span class="fn">int</span>(parts[<span class="nm">0</span>]) + <span class="fn">int</span>(parts[<span class="nm">1</span>]) / <span class="nm">60</span>  <span class="cm"># decimal minutes</span></pre>
+
+  <h3>Synthetic IDs</h3>
+  <p>
+    Garmin's CSV format does not include a unique activity ID (unlike the API).
+    We generate a deterministic ID by hashing the date + distance + duration.
+    The same run always produces the same hash, making re-imports safe.
+    IDs are made negative to distinguish them from real Garmin API IDs (which are positive).
+  </p>
+
+  <div class="code-label">Deterministic ID generation</div>
+  <pre><span class="kw">def</span> <span class="fn">_synthetic_id</span>(date_str, distance_km, duration_min):
+    payload = <span class="fn">f</span><span class="st">"{date_str}|{distance_km}|{duration_min}"</span>.<span class="fn">encode</span>()
+    h = hashlib.<span class="fn">sha256</span>(payload).<span class="fn">hexdigest</span>()[:<span class="nm">15</span>]  <span class="cm"># 60-bit hash</span>
+    <span class="kw">return</span> -<span class="fn">int</span>(h, <span class="nm">16</span>)  <span class="cm"># negative = CSV-sourced</span></pre>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     6 — PLAYWRIGHT SYNC
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num teal">6</div>
+    <h2>Playwright Sync — Browser Automation</h2>
+  </div>
+
+  <p>
+    <strong>Playwright</strong> is a browser automation library from Microsoft. It can control
+    Chrome, Firefox, or Edge programmatically — clicking buttons, filling forms, and capturing
+    downloads — exactly as a human user would.
+  </p>
+
+  <div class="callout blue">
+    <span class="callout-icon">🔒</span>
+    <div>
+      <strong>Why not the official Garmin API?</strong> Garmin's developer program is B2B-only —
+      it requires a registered company and a formal application process. For personal use,
+      browser automation against the same website you log into manually is the only stable path.
+    </div>
+  </div>
+
+  <h3>The persistent profile strategy</h3>
+  <p>
+    A fresh browser profile with no history, no cookies, and no saved preferences looks like
+    a bot to Garmin's login system. We use a <strong>persistent profile</strong> stored in
+    <code>data/chrome_profile/</code> that survives between runs. After the first login
+    the session is reused automatically.
+  </p>
+
+  <div class="code-label">backend/garmin_playwright.py — anti-detection</div>
+  <pre><span class="cm"># 1. Use the real Google Chrome installed on your machine (not a downloaded browser)</span>
+<span class="cm"># 2. Point to a persistent profile directory that builds up history over time</span>
+<span class="cm"># 3. Pass --disable-blink-features=AutomationControlled so Chrome does NOT</span>
+<span class="cm">#    set the navigator.webdriver flag that Garmin checks</span>
+context = pw.chromium.<span class="fn">launch_persistent_context</span>(
+    user_data_dir=<span class="st">"data/chrome_profile"</span>,
+    channel=<span class="st">"chrome"</span>,
+    headless=<span class="kw">False</span>,
+    args=[<span class="st">"--disable-blink-features=AutomationControlled"</span>],
+)
+
+<span class="cm"># 4. Inject JS into every page before it loads — overrides navigator.webdriver</span>
+context.<span class="fn">add_init_script</span>(
+    <span class="st">"Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"</span>
+)</pre>
+
+  <h3>The full sync flow</h3>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-left"><div class="flow-dot">1</div><div class="flow-line"></div></div>
+      <div class="flow-content">
+        <strong>Open Chrome → navigate to Garmin activities page</strong>
+        <span><code>page.goto("connect.garmin.com/app/activities?activityType=running")</code></span>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-left"><div class="flow-dot orange">2</div><div class="flow-line"></div></div>
+      <div class="flow-content">
+        <strong>Wait for login (if session expired)</strong>
+        <span>Script pauses up to 5 minutes. You log in manually. After login, Garmin redirects to the home page.</span>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-left"><div class="flow-dot green">3</div><div class="flow-line"></div></div>
+      <div class="flow-content">
+        <strong>Navigate back to activities page</strong>
+        <span>Detects the post-login redirect and navigates back to the activities URL automatically.</span>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-left"><div class="flow-dot purple">4</div><div class="flow-line"></div></div>
+      <div class="flow-content">
+        <strong>Wait for "Εξαγωγή σε CSV" button (up to 45 seconds)</strong>
+        <span>Garmin Connect is a heavy React app — it takes time to render. We poll for the button instead of assuming the page is ready.</span>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-left"><div class="flow-dot red">5</div><div class="flow-line"></div></div>
+      <div class="flow-content">
+        <strong>Click export → capture download → save to <code>data/CSVs/garmin_sync_YYYY-MM-DD_HHMM.csv</code></strong>
+        <span>Playwright intercepts the file download before it hits the browser's Downloads folder and saves it directly to our data directory.</span>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-left"><div class="flow-dot teal">6</div></div>
+      <div class="flow-content">
+        <strong>Auto-import the CSV → show count of new workouts</strong>
+        <span>Counts activities before and after import. The difference is the number of genuinely new runs added.</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="code-label">Waiting for the export button robustly</div>
+  <pre><span class="kw">def</span> <span class="fn">_wait_for_export_button</span>(page, timeout=<span class="nm">45_000</span>):
+    <span class="cm"># Try each locale label in turn</span>
+    <span class="kw">for</span> label <span class="kw">in</span> [<span class="st">"Εξαγωγή σε CSV"</span>, <span class="st">"Export to CSV"</span>, ...]:
+        <span class="kw">try</span>:
+            loc = page.<span class="fn">get_by_text</span>(label, exact=<span class="kw">True</span>)
+            loc.first.<span class="fn">wait_for</span>(state=<span class="st">"visible"</span>, timeout=per_label)
+            <span class="kw">return</span> loc.first
+        <span class="kw">except</span> <span class="cl">PWTimeoutError</span>:
+            <span class="kw">continue</span>
+    <span class="cm"># Fallback: any button or link containing the text "CSV"</span>
+    <span class="kw">return</span> page.<span class="fn">locator</span>(<span class="st">"button, a"</span>).<span class="fn">filter</span>(has_text=<span class="st">"CSV"</span>).first</pre>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     7 — CLAUDE AI
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num dark">7</div>
+    <h2>Claude AI Integration</h2>
+  </div>
+
+  <p>
+    We use the <strong>Anthropic Python SDK</strong> to call Claude in two distinct ways:
+    streaming chat for the coaching conversation, and structured JSON generation for weekly plans.
+  </p>
+
+  <h3>Streaming chat</h3>
+  <p>
+    The coaching chat uses <strong>streaming</strong> — Claude sends its response token by token
+    as it generates it, rather than waiting until the full answer is ready. This makes the
+    conversation feel live and responsive, like watching someone type.
+  </p>
+
+  <div class="code-label">backend/routes/chat.py — streaming response</div>
+  <pre><span class="kw">with</span> anthropic_client.messages.<span class="fn">stream</span>(
+    model=<span class="st">"claude-opus-4-7"</span>,
+    system=<span class="st">f"""You are an expert running coach.
+The athlete's recent stats: {stats_summary}
+Their current goals: {goals}
+Their personal records: {personal_records}"""</span>,
+    messages=conversation_history,
+) <span class="kw">as</span> stream:
+    <span class="kw">for</span> text <span class="kw">in</span> stream.text_stream:
+        <span class="kw">yield</span> text   <span class="cm"># each token sent to browser immediately</span></pre>
+
+  <div class="callout blue">
+    <span class="callout-icon">💡</span>
+    <div>
+      <strong>Context injection:</strong> Before calling Claude, we fetch your real run data from
+      the database and embed it in the system prompt. Claude is not guessing — it is reasoning
+      about your actual 859 runs, your specific goals, and your real personal records.
+    </div>
+  </div>
+
+  <h3>Weekly plan generation — structured output</h3>
+  <p>
+    For weekly plans we use a <strong>structured prompt</strong>: we instruct Claude to respond
+    exclusively in a specific JSON format. We then extract the JSON with a regex, validate it
+    has exactly 7 days, and store it in the database.
+  </p>
+
+  <div class="code-label">backend/routes/plans.py — structured JSON prompt</div>
+  <pre>prompt = <span class="st">f"""
+Generate a 7-day training plan. Respond ONLY with valid JSON,
+no explanation, no markdown fences:
+{{
+  "week_theme": "...",
+  "days": [
+    {{
+      "day": "Monday",
+      "workout_type": "easy",   <span class="cm">// easy|tempo|intervals|long|rest|cross</span>
+      "title": "Easy recovery run",
+      "description": "...",
+      "distance_km": 8,
+      "duration_min": 50
+    }},
+    ...  <span class="cm">// 7 days total</span>
+  ]
+}}
+
+Athlete context:
+- Total runs: {stats["total_runs"]}, Total km: {stats["total_km"]}
+- This week: {stats["this_week_km"]} km
+- Goals: {goals_text}
+"""</span>
+
+<span class="cm"># Extract JSON from response using regex (robust to extra text)</span>
+match = re.<span class="fn">search</span>(<span class="st">r'\{.*\}'</span>, response, re.DOTALL)
+plan = json.<span class="fn">loads</span>(match.<span class="fn">group</span>())</pre>
+
+  <h3>Workout badge colours</h3>
+  <table>
+    <tr><th>Type</th><th>Colour</th><th>What it means</th></tr>
+    <tr><td>Easy</td><td><span style="background:#1f8a4c;color:white;padding:2px 8px;border-radius:4px;font-size:0.8rem">green</span></td><td>Low heart rate, conversational pace, recovery</td></tr>
+    <tr><td>Tempo</td><td><span style="background:#f5a623;color:white;padding:2px 8px;border-radius:4px;font-size:0.8rem">orange</span></td><td>Comfortably hard, lactate threshold training</td></tr>
+    <tr><td>Intervals</td><td><span style="background:#e05252;color:white;padding:2px 8px;border-radius:4px;font-size:0.8rem">red</span></td><td>High intensity repeats with recovery between</td></tr>
+    <tr><td>Long</td><td><span style="background:#4f8cff;color:white;padding:2px 8px;border-radius:4px;font-size:0.8rem">blue</span></td><td>Weekly long run at easy pace, builds endurance base</td></tr>
+    <tr><td>Rest</td><td><span style="background:#98a2b3;color:white;padding:2px 8px;border-radius:4px;font-size:0.8rem">grey</span></td><td>Full rest or very light activity</td></tr>
+    <tr><td>Cross</td><td><span style="background:#9b59b6;color:white;padding:2px 8px;border-radius:4px;font-size:0.8rem">purple</span></td><td>Cross-training (cycling, swimming, gym)</td></tr>
+  </table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     8 — FRONTEND
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num pink">8</div>
+    <h2>Frontend — HTMX + Chart.js</h2>
+  </div>
+
+  <p>
+    The entire frontend is a <strong>single HTML file</strong> — no React, no Vue, no
+    <code>npm install</code>, no build pipeline. For a personal local tool, the simplest
+    approach that works is the correct one.
+  </p>
+
+  <h3>HTMX — server-rendered interactivity without JavaScript</h3>
+  <p>
+    HTMX is a small library (~14 KB) that lets HTML elements make HTTP requests and swap
+    the server's response into the page — without writing any JavaScript. The server builds
+    the HTML; HTMX handles the swap.
+  </p>
+
+  <div class="code-label">Example: the Sync button</div>
+  <pre><span class="cm">&lt;!-- When clicked: POST to /sync, show spinner, put response into #activities-panel --&gt;</span>
+&lt;<span class="kw">button</span>
+  <span class="at">hx-post</span>=<span class="st">"/sync"</span>
+  <span class="at">hx-target</span>=<span class="st">"#activities-panel"</span>
+  <span class="at">hx-indicator</span>=<span class="st">"this"</span>&gt;
+  Sync from Garmin
+&lt;/<span class="kw">button</span>&gt;
+
+<span class="cm">&lt;!-- This div auto-loads its content from /activities on page load --&gt;</span>
+&lt;<span class="kw">div</span> <span class="at">id</span>=<span class="st">"activities-panel"</span>
+     <span class="at">hx-get</span>=<span class="st">"/activities?days=30"</span>
+     <span class="at">hx-trigger</span>=<span class="st">"load"</span>&gt;
+  Loading...
+&lt;/<span class="kw">div</span>&gt;</pre>
+
+  <h3>Chart.js — the dashboard charts</h3>
+  <p>
+    The four dashboard charts use Chart.js 4.4.3, loaded from a CDN. The browser fetches
+    JSON from five <code>/stats/*</code> endpoints simultaneously using <code>Promise.all()</code>,
+    then renders all charts at once. Charts only initialise when the Dashboard tab is first
+    opened — not on every page load.
+  </p>
+
+  <div class="code-label">Lazy chart initialisation</div>
+  <pre><span class="kw">let</span> dashReady = <span class="kw">false</span>;
+
+<span class="kw">function</span> <span class="fn">showTab</span>(id) {
+    <span class="cm">// Only fetch + render charts the first time Dashboard is opened</span>
+    <span class="kw">if</span> (id === <span class="st">'dashboard'</span> &amp;&amp; !dashReady) {
+        dashReady = <span class="kw">true</span>;
+        <span class="fn">initCharts</span>();
+    }
+}
+
+<span class="kw">async function</span> <span class="fn">initCharts</span>() {
+    <span class="cm">// Fetch all 5 endpoints in parallel</span>
+    <span class="kw">const</span> [summary, mileage, pace, hr, prs] = <span class="kw">await</span> Promise.<span class="fn">all</span>([
+        <span class="fn">fetch</span>(<span class="st">'/stats/summary'</span>).<span class="fn">then</span>(r => r.<span class="fn">json</span>()),
+        <span class="fn">fetch</span>(<span class="st">'/stats/weekly-mileage'</span>).<span class="fn">then</span>(r => r.<span class="fn">json</span>()),
+        <span class="fn">fetch</span>(<span class="st">'/stats/pace-trend'</span>).<span class="fn">then</span>(r => r.<span class="fn">json</span>()),
+        <span class="fn">fetch</span>(<span class="st">'/stats/hr-trend'</span>).<span class="fn">then</span>(r => r.<span class="fn">json</span>()),
+        <span class="fn">fetch</span>(<span class="st">'/stats/prs'</span>).<span class="fn">then</span>(r => r.<span class="fn">json</span>()),
+    ]);
+    <span class="cm">// Render charts with the received data...</span>
+}</pre>
+
+  <h3>Responsive layout</h3>
+  <table>
+    <tr><th>Screen size</th><th>Navigation</th><th>Charts</th></tr>
+    <tr><td>Desktop (&gt; 767px)</td><td>Horizontal tab bar at top</td><td>2 × 2 grid</td></tr>
+    <tr><td>Mobile (&lt; 767px)</td><td>Fixed bottom nav with emoji icons 📊🏃📅🎯💬</td><td>Single column stack</td></tr>
+  </table>
+
+  <p>
+    No CSS framework is used. All styling is custom CSS using variables for the dark theme,
+    making it trivial to change the colour scheme in one place.
+  </p>
+
+  <div class="code-label">CSS custom properties (theme variables)</div>
+  <pre><span class="at">:root</span> {
+    --bg:      <span class="st">#0f1117</span>;   <span class="cm">/* page background */</span>
+    --panel:   <span class="st">#1a1d27</span>;   <span class="cm">/* cards and tables */</span>
+    --accent:  <span class="st">#4f8cff</span>;   <span class="cm">/* buttons, links, highlights */</span>
+    --border:  <span class="st">#2d3748</span>;   <span class="cm">/* dividers */</span>
+    --muted:   <span class="st">#98a2b3</span>;   <span class="cm">/* secondary text */</span>
+}</pre>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     9 — DATA FLOW
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num indigo">9</div>
+    <h2>Data Flow — End to End</h2>
+  </div>
+
+  <h3>When you click "Sync from Garmin"</h3>
+  <div class="arch">
+    <div style="color:#e2e8f0; line-height:2">
+Browser &nbsp;<span style="color:#546e7a">→</span> <span style="color:#82aaff">POST /sync</span><br>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> <span style="color:#ffd580">garmin_playwright.export_csv()</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> Chrome opens with saved session (data/chrome_profile/)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> navigate to connect.garmin.com/app/activities?activityType=running<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> <span style="color:#f07178">if not logged in:</span> wait up to 5 min for you to log in<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> wait up to 45s for "Εξαγωγή σε CSV" button to appear<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> click button → download captured → saved as garmin_sync_2026-06-07_1430.csv<br>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> <span style="color:#ffd580">csv_importer.import_csv_file(path)</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> detect locale (Greek or English)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> parse rows → generate synthetic IDs → upsert into PostgreSQL<br>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> <span style="color:#c3e88d">count_after - count_before</span> = new workouts added<br>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> return HTML banner + refreshed table<br>
+Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">"Added 3 new workouts from Garmin"</span> + updated table
+    </div>
+  </div>
+
+  <h3>When you open the Dashboard</h3>
+  <div class="arch">
+    <div style="color:#e2e8f0; line-height:2">
+Browser <span style="color:#82aaff">→ fetch('/stats/summary')</span> &nbsp;&nbsp;&nbsp;&nbsp;→ 4 totals for stat cards<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#82aaff">→ fetch('/stats/weekly-mileage')</span> → bar chart labels + values<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#82aaff">→ fetch('/stats/pace-trend')</span> &nbsp;&nbsp;&nbsp;→ line chart dates + paces<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#82aaff">→ fetch('/stats/hr-trend')</span> &nbsp;&nbsp;&nbsp;&nbsp;→ HR line chart data + paces<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#82aaff">→ fetch('/stats/prs')</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ fastest 5k / 10k / HM / marathon<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">(all 5 run in parallel)</span><br>
+Chart.js <span style="color:#c3e88d">renders all charts simultaneously</span>
+    </div>
+  </div>
+
+  <h3>When you generate a Weekly Plan</h3>
+  <div class="arch">
+    <div style="color:#e2e8f0; line-height:2">
+Browser <span style="color:#546e7a">→</span> <span style="color:#82aaff">POST /plans/generate</span><br>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> fetch stats + recent runs + goals from PostgreSQL<br>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> <span style="color:#c39bd3">Anthropic Claude API</span> (claude-opus-4-7)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;system: "You are an expert running coach. Athlete stats: ..."<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user: "Generate a 7-day plan as JSON"<br>
+&nbsp;&nbsp;<span style="color:#546e7a">←</span> Claude returns JSON with 7 workout days<br>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> validate JSON has exactly 7 days<br>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> store in weekly_plans table (status='proposed')<br>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> render as HTML day-cards<br>
+Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">7 coloured workout cards with Accept / Regenerate / Archive buttons</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     10 — FILE REFERENCE
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num green">10</div>
+    <h2>File Reference</h2>
+  </div>
+
+  <div class="file-tree">
+<span class="dir">garmin-coach/</span><br>
+├── <span class="dir">backend/</span><br>
+│ &nbsp;&nbsp;├── <span class="file">main.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># FastAPI app entry point — mounts all routers</span><br>
+│ &nbsp;&nbsp;├── <span class="file">config.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># loads .env, exposes DATABASE_URL, API keys, paths</span><br>
+│ &nbsp;&nbsp;├── <span class="file">db.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># ALL database functions: schema, upsert, queries</span><br>
+│ &nbsp;&nbsp;├── <span class="file">csv_importer.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># multi-locale Garmin CSV parser + importer</span><br>
+│ &nbsp;&nbsp;├── <span class="file">garmin_playwright.py</span> &nbsp; <span class="note"># browser automation sync via Chrome/Playwright</span><br>
+│ &nbsp;&nbsp;├── <span class="file">sync.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># legacy API sync (kept but unused)</span><br>
+│ &nbsp;&nbsp;└── <span class="dir">routes/</span><br>
+│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">activities.py</span> &nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /activities /sync /import/csv</span><br>
+│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">stats.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /stats/* — JSON for all dashboard charts</span><br>
+│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">plans.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /plans/* — AI weekly plan generation</span><br>
+│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">goals.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /goals/* — CRUD for race targets</span><br>
+│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="file">chat.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /chat — streaming AI coaching conversation</span><br>
+├── <span class="dir">frontend/</span><br>
+│ &nbsp;&nbsp;└── <span class="file">index.html</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># entire UI — all CSS, HTML, JS in one file</span><br>
+├── <span class="dir">scripts/</span><br>
+│ &nbsp;&nbsp;└── <span class="file">bulk_import_csvs.py</span> &nbsp;&nbsp; <span class="note"># imports many CSV/xlsx files at once</span><br>
+├── <span class="dir">data/</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># ← gitignored: never committed</span><br>
+│ &nbsp;&nbsp;├── <span class="dir">CSVs/</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># raw Garmin CSV exports</span><br>
+│ &nbsp;&nbsp;└── <span class="dir">chrome_profile/</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># Playwright persistent browser session + cookies</span><br>
+├── <span class="file">requirements.txt</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># Python dependencies</span><br>
+├── <span class="file">start_app.bat</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># double-click launcher for Windows</span><br>
+└── <span class="file">.env</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># secrets: API key, DB password — never in git</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     11 — TECHNOLOGY CHOICES
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num red">11</div>
+    <h2>Technology Choices — The "Why"</h2>
+  </div>
+
+  <table>
+    <tr><th>Technology</th><th>Role</th><th>Why we chose it</th></tr>
+    <tr>
+      <td><strong>FastAPI</strong></td>
+      <td>Web framework</td>
+      <td>Modern Python, async-capable, auto-generates OpenAPI docs, typed — faster to develop than Flask/Django for API-first apps</td>
+    </tr>
+    <tr>
+      <td><strong>PostgreSQL</strong></td>
+      <td>Database</td>
+      <td>JSONB support for raw Garmin data, proper upsert with conflict resolution, connection pooling — production-grade even for a personal tool</td>
+    </tr>
+    <tr>
+      <td><strong>psycopg3</strong></td>
+      <td>DB driver</td>
+      <td>Newest Postgres Python driver; native async support and built-in connection pooling in a single package</td>
+    </tr>
+    <tr>
+      <td><strong>Playwright</strong></td>
+      <td>Browser automation</td>
+      <td>Controls a real browser — immune to API changes, handles JavaScript-heavy SPAs, supports persistent profiles for session reuse</td>
+    </tr>
+    <tr>
+      <td><strong>HTMX</strong></td>
+      <td>Frontend interactivity</td>
+      <td>Server-rendered HTML without a JS framework — no build step, no node_modules, simpler mental model for a personal tool</td>
+    </tr>
+    <tr>
+      <td><strong>Chart.js</strong></td>
+      <td>Data visualisation</td>
+      <td>Well-documented, CDN-ready (no install), handles all chart types needed with good default styling</td>
+    </tr>
+    <tr>
+      <td><strong>Claude API</strong></td>
+      <td>AI engine</td>
+      <td>Best reasoning for coaching context; streaming API makes chat feel live; structured JSON output for plan generation is reliable</td>
+    </tr>
+    <tr>
+      <td><strong>Single HTML file</strong></td>
+      <td>Frontend</td>
+      <td>No build pipeline, no transpilation, no dependency management — open it in any browser and it works</td>
+    </tr>
+  </table>
+
+  <div class="callout green">
+    <span class="callout-icon">📊</span>
+    <div>
+      <strong>Scale as of June 2026:</strong> 859 runs · 3,949 km of data spanning May 2024 – June 2026 (25 months).
+      Imported from 13 CSVs across multiple overlapping date ranges. Zero duplicates.
+    </div>
+  </div>
+</div>
+
+<!-- footer -->
+<div style="text-align:center; color:#aaa; font-size:0.8rem; padding: 2rem 0 1rem; border-top: 1px solid #eef0f6; margin-top: 2rem;">
+  Garmin Coach · Technical Documentation · June 2026 · Nikanoras Papadopoulos
+</div>
+
+</div><!-- /page -->
+</body>
+</html>

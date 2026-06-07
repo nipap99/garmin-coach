@@ -61,13 +61,17 @@ def pace_trend(limit: int = Query(30, ge=5, le=100)):
     }
 
 
-@router.get("/vo2max")
-def vo2max_trend():
-    """VO2max readings over time."""
-    rows = db.get_vo2max_trend()
+@router.get("/hr-trend")
+def hr_trend(limit: int = Query(30, ge=5, le=100)):
+    """Average heart rate per run for the trend chart."""
+    rows = db.get_hr_trend(limit=limit)
     return {
-        "labels": [r["start_local"][:10] for r in rows],
-        "values": [float(r["vo2max"]) for r in rows],
+        "labels":    [r["start_local"][:10] for r in rows],
+        "values":    [int(r["avg_hr"]) for r in rows],
+        "distances": [round(float(r["distance_km"]), 1) for r in rows],
+        "paces":     [round(float(r["avg_pace_min_per_km"]), 3)
+                      if r.get("avg_pace_min_per_km") else None
+                      for r in rows],
     }
 
 

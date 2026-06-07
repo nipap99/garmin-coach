@@ -12,7 +12,7 @@ from pathlib import Path
 from fastapi import APIRouter, File, Query, UploadFile
 from fastapi.responses import HTMLResponse
 
-from .. import csv_importer, db, sync as sync_module
+from .. import csv_importer, db, garmin_playwright
 from ..garmin_client import _format_pace
 
 logger = logging.getLogger(__name__)
@@ -21,17 +21,18 @@ router = APIRouter()
 
 
 def _render_activities_table(rows: list[dict]) -> str:
-    """Render the activities table as an HTML fragment."""
+    """Render the activities table wrapped in its scroll container."""
     if not rows:
         return (
+            '<div class="table-scroll panel">'
             '<div class="empty">'
             "No activities yet. Click <strong>Sync from Garmin</strong> "
             "above to pull your recent runs."
-            "</div>"
+            "</div></div>"
         )
 
     header = (
-        "<table>"
+        '<div class="table-scroll panel"><table>'
         "<thead><tr>"
         "<th>Date</th><th>Name</th><th>Distance</th>"
         "<th>Duration</th><th>Pace</th><th>Avg HR</th><th>VO2max</th>"
@@ -51,7 +52,7 @@ def _render_activities_table(rows: list[dict]) -> str:
             f"<td>{r.get('vo2max') or '—'}</td>"
             "</tr>"
         )
-    return header + "".join(body_rows) + "</tbody></table>"
+    return header + "".join(body_rows) + "</tbody></table></div>"
 
 
 @router.get("/activities", response_class=HTMLResponse)
@@ -68,17 +69,20 @@ def trigger_sync(days: int = Query(30, ge=1, le=365)) -> HTMLResponse:
     Returns a status banner + the refreshed activities table.
     """
     try:
-        n = sync_module.sync_recent_runs(days=days)
-        banner = (
-            f'<div class="banner success">Synced {n} runs from Garmin '
-            f"(last {days} days).</div>"
-        )
+        count_before = db.count_activities()
+        csv_path = garmin_playwright.export_csv()
+        csv_importer.import_csv_file(csv_path)
+        new_count = db.count_activities() - count_before
+        if new_count == 0:
+            msg = "Sync complete — no new workouts (all already in your database)."
+        elif new_count == 1:
+            msg = "Added 1 new workout from Garmin."
+        else:
+            msg = f"Added {new_count} new workouts from Garmin."
+        banner = f'<div class="banner success">{msg}</div>'
     except Exception as e:  # noqa: BLE001 — we want to show any error to the user
         logger.exception("Sync failed")
-        banner = (
-            f'<div class="banner error">Sync failed: '
-            f"{type(e).__name__}: {e}</div>"
-        )
+        banner = f'<div class="banner error">Sync failed: {type(e).__name__}: {e}</div>'
 
     rows = db.get_recent_activities(days=days)
     return HTMLResponse(banner + _render_activities_table(rows))
@@ -107,11 +111,16 @@ async def import_csv(file: UploadFile = File(...)) -> HTMLResponse:
             tmp.write(content)
             tmp_path = Path(tmp.name)
 
-        n = csv_importer.import_csv_file(tmp_path)
-        banner = (
-            f'<div class="banner success">Imported {n} running activities '
-            f"from {file.filename}.</div>"
-        )
+        count_before = db.count_activities()
+        csv_importer.import_csv_file(tmp_path)
+        new_count = db.count_activities() - count_before
+        if new_count == 0:
+            msg = f"No new workouts — all runs from {file.filename} already in your database."
+        elif new_count == 1:
+            msg = f"Added 1 new workout from {file.filename}."
+        else:
+            msg = f"Added {new_count} new workouts from {file.filename}."
+        banner = f'<div class="banner success">{msg}</div>'
     except Exception as e:  # noqa: BLE001
         logger.exception("CSV import failed")
         banner = (

@@ -433,15 +433,12 @@
         <canvas id="chart-pace"></canvas>
       </div>
       <div class="chart-card">
-        <h3>VO2max Trend</h3>
-        <canvas id="chart-vo2max"></canvas>
-        <div id="vo2max-empty" class="empty" style="display:none;padding:0.5rem">
-          No VO2max data — requires Garmin sync (not available in CSV exports)
-        </div>
-      </div>
-      <div class="chart-card">
         <h3>Personal Records</h3>
         <div id="pr-cards"><div class="empty" style="padding:0.5rem">Loading…</div></div>
+      </div>
+      <div class="chart-card">
+        <h3>Heart Rate Trend <span style="font-weight:400;text-transform:none;letter-spacing:0">(lower = fitter)</span></h3>
+        <canvas id="chart-hr"></canvas>
       </div>
     </div>
   </div>
@@ -452,8 +449,8 @@
       <button class="btn"
               hx-post="/sync"
               hx-target="#activities-panel"
-              hx-include="[name='days']"
-              hx-indicator="this">
+              hx-indicator="this"
+              title="Opens a browser window — log in to Garmin Connect if prompted, then the export runs automatically">
         Sync from Garmin
       </button>
       <label for="days">Last</label>
@@ -482,13 +479,10 @@
         <button class="btn" type="submit" disabled>Import</button>
       </form>
     </div>
-    <div class="table-scroll">
-      <div id="activities-panel"
-           class="panel"
-           hx-get="/activities?days=30"
-           hx-trigger="load">
-        <div class="empty">Loading…</div>
-      </div>
+    <div id="activities-panel"
+         hx-get="/activities?days=30"
+         hx-trigger="load">
+      <div class="table-scroll panel"><div class="empty">Loading…</div></div>
     </div>
   </div>
 
@@ -662,11 +656,11 @@ async function initDashboard() {
   dashReady = true;
 
   try {
-    const [summary, mileage, pace, vo2max, prs] = await Promise.all([
+    const [summary, mileage, pace, hr, prs] = await Promise.all([
       fetch('/stats/summary').then(r => r.json()),
       fetch('/stats/weekly-mileage').then(r => r.json()),
       fetch('/stats/pace-trend').then(r => r.json()),
-      fetch('/stats/vo2max').then(r => r.json()),
+      fetch('/stats/hr-trend').then(r => r.json()),
       fetch('/stats/prs').then(r => r.json()),
     ]);
 
@@ -750,21 +744,21 @@ async function initDashboard() {
       });
     }
 
-    // VO2max trend
-    if (vo2max.labels && vo2max.labels.length) {
-      new Chart(document.getElementById('chart-vo2max'), {
+    // Heart rate trend
+    if (hr.labels && hr.labels.length) {
+      new Chart(document.getElementById('chart-hr'), {
         type: 'line',
         data: {
-          labels: vo2max.labels,
+          labels: hr.labels,
           datasets: [{
-            data: vo2max.values,
-            borderColor: '#d97706',
-            backgroundColor: 'rgba(217,119,6,0.07)',
-            tension: 0.4,
+            data: hr.values,
+            borderColor: '#e05252',
+            backgroundColor: 'rgba(224,82,82,0.07)',
+            tension: 0.35,
             fill: true,
-            pointRadius: 4,
-            pointHoverRadius: 6,
-            pointBackgroundColor: '#d97706',
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            pointBackgroundColor: '#e05252',
           }],
         },
         options: {
@@ -773,18 +767,25 @@ async function initDashboard() {
             ...CHART_BASE.plugins,
             tooltip: {
               ...CHART_BASE.plugins.tooltip,
-              callbacks: { label: ctx => 'VO2max: ' + ctx.raw },
+              callbacks: {
+                label: ctx => {
+                  const pace = hr.paces[ctx.dataIndex];
+                  const paceStr = pace ? '  |  ' + fmtPace(pace) + '/km' : '';
+                  return ctx.raw + ' bpm  |  ' + hr.distances[ctx.dataIndex] + ' km' + paceStr;
+                },
+              },
             },
           },
           scales: {
             ...CHART_BASE.scales,
-            y: { ...CHART_BASE.scales.y, beginAtZero: false },
+            y: {
+              ...CHART_BASE.scales.y,
+              beginAtZero: false,
+              ticks: { ...CHART_BASE.scales.y.ticks, callback: v => v + ' bpm' },
+            },
           },
         },
       });
-    } else {
-      document.getElementById('chart-vo2max').style.display = 'none';
-      document.getElementById('vo2max-empty').style.display = 'block';
     }
 
     // PR cards
