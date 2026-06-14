@@ -496,6 +496,7 @@
   <nav class="desktop-tabs">
     <button class="tab-btn active" data-tab="dashboard">Running</button>
     <button class="tab-btn" data-tab="cycling">Cycling</button>
+    <button class="tab-btn" data-tab="sleep">Sleep</button>
     <button class="tab-btn" data-tab="plan">Training Plan</button>
     <button class="tab-btn" data-tab="goals">Goals</button>
     <button class="tab-btn" data-tab="coach">Coach</button>
@@ -629,6 +630,54 @@
       <div class="chart-card">
         <h3>Heart Rate Trend <span style="font-weight:400;text-transform:none;letter-spacing:0">(lower = fitter)</span></h3>
         <canvas id="chart-cyc-hr"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Sleep ──────────────────────────────────────────────────────────── -->
+  <div id="panel-sleep" class="tab-panel" hidden>
+    <div class="toolbar">
+      <button class="btn"
+              hx-post="/sync/sleep"
+              hx-target="#sync-status-sleep"
+              hx-indicator="this"
+              title="Exports your weekly sleep CSV from Garmin. Opens a browser — log in if prompted.">
+        Sync Sleep
+      </button>
+    </div>
+    <div id="sync-status-sleep"></div>
+
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-value" id="slp-score">—</div>
+        <div class="stat-label">Avg Sleep Score</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="slp-duration">—</div>
+        <div class="stat-label">Avg Duration</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="slp-need">—</div>
+        <div class="stat-label">Avg Sleep Need</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="slp-weeks">—</div>
+        <div class="stat-label">Weeks Tracked</div>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Sleep Score <span style="font-weight:400;text-transform:none;letter-spacing:0">(higher = better)</span></h3>
+        <canvas id="chart-slp-score"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Duration vs Need <span style="font-weight:400;text-transform:none;letter-spacing:0">(hours slept vs needed)</span></h3>
+        <canvas id="chart-slp-duration"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Bedtime &amp; Wake <span style="font-weight:400;text-transform:none;letter-spacing:0">(consistency)</span></h3>
+        <canvas id="chart-slp-timing"></canvas>
       </div>
     </div>
   </div>
@@ -773,6 +822,10 @@
     <span class="mobile-icon">&#128692;</span>
     <span>Cycling</span>
   </button>
+  <button class="mobile-tab" data-tab="sleep">
+    <span class="mobile-icon">&#128564;</span>
+    <span>Sleep</span>
+  </button>
   <button class="mobile-tab" data-tab="plan">
     <span class="mobile-icon">&#128197;</span>
     <span>Plan</span>
@@ -797,6 +850,7 @@ function showTab(name) {
   if (name === 'dashboard') initDashboard();
   if (name === 'goals')     initGoals();
   if (name === 'cycling')   initCycling();
+  if (name === 'sleep')     initSleep();
 }
 
 document.querySelectorAll('[data-tab]').forEach(btn => {
@@ -1230,6 +1284,106 @@ async function initCycling() {
   }
 }
 
+// ── Sleep tab (lazy) ───────────────────────────────────────────────────────
+let sleepReady = false;
+const _slpCharts = {};
+const SLP = '#6c5ce7';   // indigo accent for sleep
+
+async function initSleep() {
+  if (sleepReady) return;
+  sleepReady = true;
+
+  try {
+    const [summary, t] = await Promise.all([
+      fetch('/stats/sleep/summary').then(r => r.json()),
+      fetch('/stats/sleep/trend').then(r => r.json()),
+    ]);
+
+    document.getElementById('slp-score').textContent    = summary.avg_score || '—';
+    document.getElementById('slp-duration').textContent = summary.avg_duration_fmt || '—';
+    document.getElementById('slp-need').textContent     = summary.avg_need_fmt || '—';
+    document.getElementById('slp-weeks').textContent    = summary.weeks_tracked || 0;
+
+    if (!t.labels || !t.labels.length) return;
+
+    // Sleep score trend (higher = better)
+    _slpCharts.score = new Chart(document.getElementById('chart-slp-score'), {
+      type: 'line',
+      data: {
+        labels: t.labels,
+        datasets: [{
+          data: t.scores,
+          borderColor: SLP,
+          backgroundColor: 'rgba(108,109,231,0.10)',
+          tension: 0.35, fill: true, pointRadius: 2, pointHoverRadius: 5,
+          pointBackgroundColor: SLP, spanGaps: true,
+        }],
+      },
+      options: {
+        ...CHART_BASE,
+        plugins: { ...CHART_BASE.plugins, tooltip: { ...CHART_BASE.plugins.tooltip,
+          callbacks: { label: ctx => 'Score ' + ctx.raw } } },
+        scales: { ...CHART_BASE.scales,
+          y: { ...CHART_BASE.scales.y, suggestedMin: 60, suggestedMax: 100 } },
+      },
+    });
+
+    // Duration vs Need (two lines, hours)
+    _slpCharts.duration = new Chart(document.getElementById('chart-slp-duration'), {
+      type: 'line',
+      data: {
+        labels: t.labels,
+        datasets: [
+          { label: 'Slept', data: t.duration_h, borderColor: SLP,
+            backgroundColor: 'rgba(108,109,231,0.10)', tension: 0.35, fill: true,
+            pointRadius: 2, pointHoverRadius: 5, pointBackgroundColor: SLP, spanGaps: true },
+          { label: 'Need', data: t.need_h, borderColor: '#98a2b3', borderDash: [5,4],
+            tension: 0.35, fill: false, pointRadius: 0, pointHoverRadius: 4, spanGaps: true },
+        ],
+      },
+      options: {
+        ...CHART_BASE,
+        plugins: { ...CHART_BASE.plugins, legend: { display: true, labels: { color: '#98a2b3', font: { size: 10 }, boxWidth: 12 } },
+          tooltip: { ...CHART_BASE.plugins.tooltip, callbacks: {
+            label: ctx => ctx.dataset.label === 'Slept'
+              ? 'Slept ' + t.duration_fmt[ctx.dataIndex]
+              : 'Need ' + t.need_fmt[ctx.dataIndex] } } },
+        scales: { ...CHART_BASE.scales,
+          y: { ...CHART_BASE.scales.y, ticks: { ...CHART_BASE.scales.y.ticks, callback: v => v + 'h' } } },
+      },
+    });
+
+    // Bedtime & Wake timing
+    _slpCharts.timing = new Chart(document.getElementById('chart-slp-timing'), {
+      type: 'line',
+      data: {
+        labels: t.labels,
+        datasets: [
+          { label: 'Bedtime', data: t.bedtime_plot, borderColor: SLP,
+            tension: 0.35, fill: false, pointRadius: 2, pointHoverRadius: 5,
+            pointBackgroundColor: SLP, spanGaps: true },
+          { label: 'Wake', data: t.wake_plot, borderColor: '#f5a623',
+            tension: 0.35, fill: false, pointRadius: 2, pointHoverRadius: 5,
+            pointBackgroundColor: '#f5a623', spanGaps: true },
+        ],
+      },
+      options: {
+        ...CHART_BASE,
+        plugins: { ...CHART_BASE.plugins, legend: { display: true, labels: { color: '#98a2b3', font: { size: 10 }, boxWidth: 12 } },
+          tooltip: { ...CHART_BASE.plugins.tooltip, callbacks: {
+            label: ctx => ctx.dataset.label === 'Bedtime'
+              ? 'Bed ' + (t.bedtime[ctx.dataIndex] || '—')
+              : 'Wake ' + (t.wake[ctx.dataIndex] || '—') } } },
+        scales: { ...CHART_BASE.scales,
+          y: { ...CHART_BASE.scales.y, ticks: { ...CHART_BASE.scales.y.ticks,
+            callback: v => { const h = Math.floor(v % 24); return (h < 10 ? '0' + h : h) + ':00'; } } } },
+      },
+    });
+  } catch (err) {
+    console.error('Sleep init error:', err);
+  }
+}
+
 // ── Auto-refresh dashboard + cycling after sync / CSV import ────────────────
 document.body.addEventListener('htmx:afterRequest', evt => {
   const url  = evt.detail.requestConfig?.path || '';
@@ -1239,8 +1393,10 @@ document.body.addEventListener('htmx:afterRequest', evt => {
     // Reset so each tab re-fetches fresh data
     dashReady = false;
     cycReady = false;
+    sleepReady = false;
     if (!document.getElementById('panel-dashboard').hidden) initDashboard();
     if (!document.getElementById('panel-cycling').hidden)   initCycling();
+    if (!document.getElementById('panel-sleep').hidden)     initSleep();
   }
 });
 

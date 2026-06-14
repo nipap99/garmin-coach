@@ -81,6 +81,20 @@ CREATE TABLE IF NOT EXISTS weekly_plans (
     status      TEXT NOT NULL DEFAULT 'proposed',  -- proposed | accepted | archived
     created_at  TEXT NOT NULL
 );
+
+-- Weekly sleep summaries from Garmin's sleep CSV export (7-day view).
+-- Sleep is not an activity, so it lives in its own table keyed by week.
+CREATE TABLE IF NOT EXISTS sleep_weeks (
+    week_start        TEXT PRIMARY KEY,   -- ISO date of the week's first day
+    week_label        TEXT,               -- original label, e.g. "Μάι. 18-24"
+    avg_score         INTEGER,            -- Garmin sleep score 0–100
+    quality           TEXT,               -- Καλό / Άριστη / Αρκετά καλή
+    avg_duration_min  DOUBLE PRECISION,   -- average time actually slept
+    avg_need_min      DOUBLE PRECISION,   -- average sleep the body needed
+    avg_bedtime       TEXT,               -- 24h "HH:MM"
+    avg_wake_time     TEXT,               -- 24h "HH:MM"
+    synced_at         TEXT NOT NULL
+);
 """
 
 VALID_DISTANCES = ("5k", "10k", "half_marathon", "marathon")
@@ -645,3 +659,82 @@ def get_latest_weekly_plan(source: str | None = None) -> dict[str, Any] | None:
                 (source,),
             ).fetchone()
     return dict(row) if row else None
+
+
+# ───────────────────────────── Sleep ─────────────────────────────────────
+
+
+def upsert_sleep_week(rec: dict[str, Any]) -> None:
+    """Insert or update one weekly sleep summary, keyed on ``week_start``."""
+    if not rec.get("week_start"):
+        return
+    payload = {
+        "week_start":       rec.get("week_start"),
+        "week_label":       rec.get("week_label"),
+        "avg_score":        rec.get("avg_score"),
+        "quality":          rec.get("quality"),
+        "avg_duration_min": rec.get("avg_duration_min"),
+        "avg_need_min":     rec.get("avg_need_min"),
+        "avg_bedtime":      rec.get("avg_bedtime"),
+        "avg_wake_time":    rec.get("avg_wake_time"),
+        "synced_at":        datetime.utcnow().isoformat(),
+    }
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO sleep_weeks
+                (week_start, week_label, avg_score, quality, avg_duration_min,
+                 avg_need_min, avg_bedtime, avg_wake_time, synced_at)
+            VALUES
+                (%(week_start)s, %(week_label)s, %(avg_score)s, %(quality)s,
+                 %(avg_duration_min)s, %(avg_need_min)s, %(avg_bedtime)s,
+                 %(avg_wake_time)s, %(synced_at)s)
+            ON CONFLICT (week_start) DO UPDATE SET
+                week_label       = excluded.week_label,
+                avg_score        = COALESCE(excluded.avg_score, sleep_weeks.avg_score),
+                quality          = COALESCE(excluded.quality, sleep_weeks.quality),
+                avg_duration_min = COALESCE(excluded.avg_duration_min, sleep_weeks.avg_duration_min),
+                avg_need_min     = COALESCE(excluded.avg_need_min, sleep_weeks.avg_need_min),
+                avg_bedtime      = COALESCE(excluded.avg_bedtime, sleep_weeks.avg_bedtime),
+                avg_wake_time    = COALESCE(excluded.avg_wake_time, sleep_weeks.avg_wake_time),
+                synced_at        = excluded.synced_at
+            """,
+            payload,
+        )
+
+
+def count_sleep_weeks() -> int:
+    """Total number of stored sleep weeks."""
+    with get_connection() as conn:
+        row = conn.execute("SELECT COUNT(*) AS n FROM sleep_weeks").fetchone()
+    return int(row["n"]) if row else 0
+
+
+def get_sleep_weeks(limit: int = 52) -> list[dict[str, Any]]:
+    """Return the most recent N sleep weeks, oldest first (for charts)."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT * FROM sleep_weeks
+            ORDER BY week_start DESC
+            LIMIT %s
+            """,
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in reversed(rows)]
+
+
+def get_sleep_summary() -> dict[str, Any]:
+    """Aggregate stats for the sleep stat cards (across all stored weeks)."""
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                COUNT(*)                                       AS weeks_tracked,
+                ROUND(AVG(avg_score)::numeric, 0)              AS avg_score,
+                ROUND(AVG(avg_duration_min)::numeric, 0)       AS avg_duration_min,
+                ROUND(AVG(avg_need_min)::numeric, 0)           AS avg_need_min
+            FROM sleep_weeks
+            """,
+        ).fetchone()
+    return dict(row) if row else {}

@@ -136,6 +136,59 @@ def cycling_hr_trend(limit: int = Query(30, ge=5, le=100)):
     }
 
 
+def _fmt_hm(minutes) -> str:
+    if not minutes:
+        return "—"
+    m = int(round(float(minutes)))
+    return f"{m // 60}h {m % 60:02d}m"
+
+
+def _time_to_plot(hhmm: str | None, night: bool) -> float | None:
+    """Convert 'HH:MM' to a decimal hour for plotting. Night (bedtime) values
+    after midnight get +24 so 00:10 sits continuously after 23:50."""
+    if not hhmm or ":" not in hhmm:
+        return None
+    h, m = hhmm.split(":")
+    val = int(h) + int(m) / 60
+    if night and val < 12:
+        val += 24
+    return round(val, 2)
+
+
+@router.get("/sleep/summary")
+def sleep_summary():
+    """Totals for the four sleep stat cards."""
+    s = db.get_sleep_summary()
+    return {
+        "weeks_tracked":    int(s["weeks_tracked"]) if s.get("weeks_tracked") else 0,
+        "avg_score":        int(s["avg_score"]) if s.get("avg_score") else 0,
+        "avg_duration_fmt": _fmt_hm(s.get("avg_duration_min")),
+        "avg_need_fmt":     _fmt_hm(s.get("avg_need_min")),
+    }
+
+
+@router.get("/sleep/trend")
+def sleep_trend(weeks: int = Query(52, ge=4, le=260)):
+    """Weekly sleep series for the Sleep-tab charts."""
+    rows = db.get_sleep_weeks(limit=weeks)
+
+    def dur_h(v):
+        return round(float(v) / 60, 2) if v else None
+
+    return {
+        "labels":        [r["week_start"] for r in rows],
+        "scores":        [int(r["avg_score"]) if r["avg_score"] is not None else None for r in rows],
+        "duration_h":    [dur_h(r["avg_duration_min"]) for r in rows],
+        "need_h":        [dur_h(r["avg_need_min"]) for r in rows],
+        "duration_fmt":  [_fmt_hm(r["avg_duration_min"]) for r in rows],
+        "need_fmt":      [_fmt_hm(r["avg_need_min"]) for r in rows],
+        "bedtime":       [r["avg_bedtime"] for r in rows],
+        "wake":          [r["avg_wake_time"] for r in rows],
+        "bedtime_plot":  [_time_to_plot(r["avg_bedtime"], night=True) for r in rows],
+        "wake_plot":     [_time_to_plot(r["avg_wake_time"], night=False) for r in rows],
+    }
+
+
 @router.get("/aerobic-efficiency")
 def aerobic_efficiency():
     """Aerobic efficiency score for each run + weekly averages for the trend line.

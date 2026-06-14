@@ -11,6 +11,7 @@ usually only needed once or after a session expires.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -31,6 +32,8 @@ SPORT_URLS: dict[str, str] = {
     "running": f"{_ACTIVITIES_BASE}?activityType=running",
     "cycling": f"{_ACTIVITIES_BASE}?activityType=cycling",
 }
+
+SLEEP_URL = "https://connect.garmin.com/app/sleep"
 
 DOWNLOAD_DIR: Path = config.PROJECT_ROOT / "data" / "CSVs"
 
@@ -135,6 +138,163 @@ def _export_one_sport(page, sport: str, navigate: bool = True) -> Path:
     dl_handle.value.save_as(dest)
     logger.info("%s CSV saved → %s", sport, dest)
     return dest
+
+
+def export_sleep() -> Path:
+    """Open the Garmin sleep page, ensure the 7-day view, and export its weekly CSV.
+
+    The sleep export lives behind a "⋮" (more) menu rather than a visible button,
+    so we select the 7-day view, open that menu, then click "Εξαγωγή σε CSV".
+    Returns the saved CSV path.
+    """
+    DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    dest = DOWNLOAD_DIR / f"garmin_sync_sleep_{timestamp}.csv"
+
+    with sync_playwright() as pw:
+        context = _launch_persistent(pw)
+        page = context.new_page()
+
+        logger.info("Opening %s", SLEEP_URL)
+        page.goto(SLEEP_URL, wait_until="domcontentloaded")
+        _wait_for_login(page)
+        if "sleep" not in page.url:
+            logger.info("Post-login redirect — returning to sleep page…")
+            page.goto(SLEEP_URL, wait_until="domcontentloaded")
+
+        try:
+            page.wait_for_load_state("networkidle", timeout=20_000)
+        except PWTimeoutError:
+            pass
+
+        _select_seven_day_view(page)
+        export_item = _open_sleep_export_menu(page)
+        if export_item is None:
+            context.close()
+            raise RuntimeError(
+                "Could not find the sleep 'Εξαγωγή σε CSV' option. The page may "
+                "have been slow, or its layout changed."
+            )
+
+        logger.info("Exporting sleep…")
+        with page.expect_download(timeout=60_000) as dl_handle:
+            export_item.click()
+        dl_handle.value.save_as(dest)
+        logger.info("Sleep CSV saved → %s", dest)
+
+        context.close()
+
+    return dest
+
+
+_SEVEN_DAY_LABELS = ["7 ημέρες", "7 days", "7 Days"]
+
+
+def _select_seven_day_view(page) -> bool:
+    """Click the 7-day range tab. The page defaults to the 1-day view, whose
+    export is a different per-night format we can't parse — so this must
+    succeed. Returns True if the tab was clicked."""
+    for label in _SEVEN_DAY_LABELS:
+        try:
+            loc = page.get_by_text(label, exact=True)
+            if loc.count() > 0:
+                loc.first.click(timeout=5_000)
+                page.wait_for_timeout(2_000)  # let the weekly view load
+                logger.info("Selected 7-day view (%r)", label)
+                return True
+        except Exception:
+            continue
+    logger.warning("Could not find the 7-day view tab — export may be 1-day data")
+    return False
+
+
+def _find_export_item(page, timeout: int = 1_500):
+    """Return the visible 'Export to CSV' menu item, or None."""
+    for label in _EXPORT_LABELS:
+        loc = page.get_by_text(label, exact=True)
+        if loc.count() > 0:
+            try:
+                loc.first.wait_for(state="visible", timeout=timeout)
+                return loc.first
+            except PWTimeoutError:
+                continue
+    return None
+
+
+def _open_sleep_export_menu(page):
+    """Open the ⋮ (more) menu and return the visible 'Export to CSV' item.
+
+    The kebab is an icon button in the top-right of the page header (just after
+    the "?" help icon). We can't target it by text, so we collect the small
+    icon-only buttons in the top region and click them rightmost-first (the ⋮
+    is the right-most one), checking after each click for the export item.
+    """
+    # Maybe it's already open / visible
+    item = _find_export_item(page, timeout=1_500)
+    if item is not None:
+        return item
+
+    # First try the explicit "more menu" attributes, if present
+    for sel in (
+        "button[aria-haspopup='menu']",
+        "button[aria-haspopup='true']",
+        "button[aria-label*='more' i]",
+        "button[aria-label*='menu' i]",
+        "button[aria-label*='επιλογ' i]",
+        "button[aria-label*='περισσότ' i]",
+    ):
+        loc = page.locator(sel)
+        for i in range(min(loc.count(), 3)):
+            try:
+                loc.nth(i).click(timeout=1_500)
+            except Exception:
+                continue
+            item = _find_export_item(page)
+            if item is not None:
+                return item
+            _dismiss(page)
+
+    # Fallback: small icon buttons in the CONTENT header, clicked right-to-left.
+    # The y-floor excludes the global top app bar (cloud / bell / watch / avatar);
+    # the ⋮ sits in the page header just below it, to the right of the "?" icon.
+    buttons = page.locator("button, [role='button']")
+    candidates: list[tuple[float, int]] = []
+    for i in range(min(buttons.count(), 80)):
+        b = buttons.nth(i)
+        try:
+            if not b.is_visible():
+                continue
+            box = b.bounding_box()
+            if not box or box["y"] < 90 or box["y"] > 450:   # content header band
+                continue
+            text = (b.inner_text() or "").strip()
+            if len(text) > 3:                    # skip labelled buttons (e.g. "7 ημέρες")
+                continue
+            candidates.append((box["x"], i))
+        except Exception:
+            continue
+
+    candidates.sort(key=lambda c: -c[0])         # right-most (the ⋮) first
+    for _, i in candidates:
+        try:
+            buttons.nth(i).click(timeout=1_500)
+        except Exception:
+            continue
+        item = _find_export_item(page)
+        if item is not None:
+            return item
+        _dismiss(page)
+
+    return None
+
+
+def _dismiss(page) -> None:
+    """Close any open menu/popover before trying the next candidate."""
+    try:
+        page.keyboard.press("Escape")
+    except Exception:
+        pass
 
 
 # ── helpers ────────────────────────────────────────────────────────────────

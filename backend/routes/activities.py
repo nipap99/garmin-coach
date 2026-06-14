@@ -12,7 +12,7 @@ from pathlib import Path
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import HTMLResponse
 
-from .. import csv_importer, db, garmin_playwright
+from .. import csv_importer, db, garmin_playwright, sleep_importer
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,31 @@ def trigger_sync_running() -> HTMLResponse:
     except Exception as e:  # noqa: BLE001
         logger.exception("Running sync failed")
         banner = f'<div class="banner error">Sync failed: {type(e).__name__}: {e}</div>'
+
+    return HTMLResponse(banner)
+
+
+@router.post("/sync/sleep", response_class=HTMLResponse)
+def trigger_sync_sleep() -> HTMLResponse:
+    """Export the weekly sleep CSV from Garmin and import it.
+
+    Used by the 'Sync Sleep' button on the Sleep tab.
+    """
+    try:
+        before = db.count_sleep_weeks()
+        path = garmin_playwright.export_sleep()
+        sleep_importer.import_sleep_csv(path)
+        new = db.count_sleep_weeks() - before
+        if new == 0:
+            msg = "Sleep sync complete — weeks refreshed (no new week yet)."
+        elif new == 1:
+            msg = "Added 1 new sleep week from Garmin."
+        else:
+            msg = f"Added {new} new sleep weeks from Garmin."
+        banner = f'<div class="banner success">{msg}</div>'
+    except Exception as e:  # noqa: BLE001
+        logger.exception("Sleep sync failed")
+        banner = f'<div class="banner error">Sleep sync failed: {type(e).__name__}: {e}</div>'
 
     return HTMLResponse(banner)
 
