@@ -19,28 +19,53 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _sync_and_import(sports: list[str]) -> int:
+    """Export the given sports from Garmin, import each CSV, return new-row count."""
+    count_before = db.count_activities()
+    for path in garmin_playwright.export_activities(sports):
+        csv_importer.import_csv_file(path)
+    return db.count_activities() - count_before
+
+
 @router.post("/sync", response_class=HTMLResponse)
 def trigger_sync() -> HTMLResponse:
-    """Export running + cycling from Garmin (via Playwright) and import them.
+    """Sync both running and cycling in one browser session (slower).
 
-    Both sports are exported in one browser session, then imported. Returns a
-    status banner reporting how many new workouts were added.
+    Used by the 'Sync from Garmin' button on the Cycling tab.
     """
     try:
-        count_before = db.count_activities()
-        csv_paths = garmin_playwright.export_activities()  # running + cycling
-        for path in csv_paths:
-            csv_importer.import_csv_file(path)
-        new_count = db.count_activities() - count_before
-        if new_count == 0:
+        n = _sync_and_import(["running", "cycling"])
+        if n == 0:
             msg = "Sync complete — no new workouts (all already in your database)."
-        elif new_count == 1:
+        elif n == 1:
             msg = "Added 1 new workout from Garmin (running + cycling)."
         else:
-            msg = f"Added {new_count} new workouts from Garmin (running + cycling)."
+            msg = f"Added {n} new workouts from Garmin (running + cycling)."
         banner = f'<div class="banner success">{msg}</div>'
     except Exception as e:  # noqa: BLE001 — we want to show any error to the user
         logger.exception("Sync failed")
+        banner = f'<div class="banner error">Sync failed: {type(e).__name__}: {e}</div>'
+
+    return HTMLResponse(banner)
+
+
+@router.post("/sync/running", response_class=HTMLResponse)
+def trigger_sync_running() -> HTMLResponse:
+    """Sync running only — faster, skips the cycling export.
+
+    Used by the 'Sync Running' button on the Running tab.
+    """
+    try:
+        n = _sync_and_import(["running"])
+        if n == 0:
+            msg = "Sync complete — no new runs (all already in your database)."
+        elif n == 1:
+            msg = "Added 1 new run from Garmin."
+        else:
+            msg = f"Added {n} new runs from Garmin."
+        banner = f'<div class="banner success">{msg}</div>'
+    except Exception as e:  # noqa: BLE001
+        logger.exception("Running sync failed")
         banner = f'<div class="banner error">Sync failed: {type(e).__name__}: {e}</div>'
 
     return HTMLResponse(banner)

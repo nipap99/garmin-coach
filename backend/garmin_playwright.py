@@ -78,9 +78,17 @@ def export_activities(sports: list[str] | None = None) -> list[Path]:
         page.goto(first_url, wait_until="domcontentloaded")
         _wait_for_login(page)
 
-        for sport in sports:
+        # After login Garmin may redirect to the home page — make sure we land
+        # back on the first sport's activities view before exporting.
+        if "activities" not in page.url:
+            logger.info("Post-login redirect detected, returning to activities…")
+            page.goto(first_url, wait_until="domcontentloaded")
+
+        for i, sport in enumerate(sports):
             try:
-                saved.append(_export_one_sport(page, sport))
+                # We're already on the first sport's page (fast path — no reload).
+                # Only navigate when switching to a later sport's filter.
+                saved.append(_export_one_sport(page, sport, navigate=i > 0))
             except Exception:  # noqa: BLE001 — keep going so one bad sport
                 logger.exception("Export failed for %s", sport)
 
@@ -94,20 +102,27 @@ def export_activities(sports: list[str] | None = None) -> list[Path]:
     return saved
 
 
-def _export_one_sport(page, sport: str) -> Path:
-    """Navigate to one sport's filtered view and export its CSV."""
+def _export_one_sport(page, sport: str, navigate: bool = True) -> Path:
+    """Export one sport's CSV.
+
+    ``navigate`` controls the slow path: when True (switching to a different
+    sport) we reload the filtered view and wait for the network to settle so
+    the activity list actually changes before we export. For the first sport
+    we're already on the page, so we skip both — keeping single-sport syncs
+    as fast as the original running-only export.
+    """
     url = SPORT_URLS[sport]
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     dest = DOWNLOAD_DIR / f"garmin_sync_{sport}_{timestamp}.csv"
 
-    logger.info("Navigating to %s view…", sport)
-    page.goto(url, wait_until="domcontentloaded")
-
-    # Let the SPA reload the filtered activity list before exporting
-    try:
-        page.wait_for_load_state("networkidle", timeout=20_000)
-    except PWTimeoutError:
-        pass  # networkidle is unreliable on SPAs; carry on
+    if navigate:
+        logger.info("Switching to %s view…", sport)
+        page.goto(url, wait_until="domcontentloaded")
+        # Let the SPA reload the filtered activity list before exporting
+        try:
+            page.wait_for_load_state("networkidle", timeout=20_000)
+        except PWTimeoutError:
+            pass  # networkidle is unreliable on SPAs; carry on
 
     logger.info("Waiting for Export CSV button (%s)…", sport)
     export_btn = _wait_for_export_button(page, timeout=45_000)

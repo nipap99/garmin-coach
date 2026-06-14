@@ -494,7 +494,7 @@
 <header>
   <div class="logo">&#127939; Garmin <span>Coach</span></div>
   <nav class="desktop-tabs">
-    <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+    <button class="tab-btn active" data-tab="dashboard">Running</button>
     <button class="tab-btn" data-tab="cycling">Cycling</button>
     <button class="tab-btn" data-tab="plan">Training Plan</button>
     <button class="tab-btn" data-tab="goals">Goals</button>
@@ -505,33 +505,32 @@
 <!-- ── Main ────────────────────────────────────────────────────────────── -->
 <main>
 
-  <!-- ── Dashboard ──────────────────────────────────────────────────────── -->
+  <!-- ── Running (Dashboard) ────────────────────────────────────────────── -->
   <div id="panel-dashboard" class="tab-panel">
     <div class="toolbar">
       <button class="btn"
-              hx-post="/sync"
-              hx-target="#sync-status"
+              hx-post="/sync/running"
+              hx-target="#sync-status-run"
               hx-indicator="this"
-              title="Opens a browser window — log in to Garmin Connect if prompted, then the export runs automatically">
-        Sync from Garmin
+              title="Syncs running activities only (faster). Opens a browser — log in to Garmin if prompted.">
+        Sync Running
       </button>
       <form hx-post="/import/csv"
-            hx-target="#sync-status"
+            hx-target="#sync-status-run"
             hx-encoding="multipart/form-data"
             style="display:inline-flex;gap:0.5rem;align-items:center">
-        <label for="csv-file"
-               style="cursor:pointer;padding:0.45rem 0.8rem;background:var(--panel);
+        <label style="cursor:pointer;padding:0.45rem 0.8rem;background:var(--panel);
                       border:1px solid var(--border);border-radius:var(--radius);font-size:0.85rem">
           Choose CSV…
+          <input type="file" name="file" accept=".csv" required style="display:none"
+                 onchange="this.form.querySelector('.import-btn').disabled=!this.files.length;
+                           this.form.querySelector('.csv-filename').textContent=this.files[0]?this.files[0].name:''">
         </label>
-        <input id="csv-file" type="file" name="file" accept=".csv" required style="display:none"
-               onchange="this.form.querySelector('button').disabled=!this.files.length;
-                         document.getElementById('csv-filename').textContent=this.files[0]?this.files[0].name:''">
-        <span id="csv-filename" style="color:var(--muted);font-size:0.82rem"></span>
-        <button class="btn" type="submit" disabled>Import</button>
+        <span class="csv-filename" style="color:var(--muted);font-size:0.82rem"></span>
+        <button class="btn import-btn" type="submit" disabled>Import</button>
       </form>
     </div>
-    <div id="sync-status"></div>
+    <div id="sync-status-run"></div>
 
     <div class="stat-cards">
       <div class="stat-card">
@@ -574,6 +573,31 @@
 
   <!-- ── Cycling ────────────────────────────────────────────────────────── -->
   <div id="panel-cycling" class="tab-panel" hidden>
+    <div class="toolbar">
+      <button class="btn"
+              hx-post="/sync"
+              hx-target="#sync-status-cyc"
+              hx-indicator="this"
+              title="Syncs BOTH running and cycling in one browser session. Opens a browser — log in to Garmin if prompted.">
+        Sync from Garmin
+      </button>
+      <form hx-post="/import/csv"
+            hx-target="#sync-status-cyc"
+            hx-encoding="multipart/form-data"
+            style="display:inline-flex;gap:0.5rem;align-items:center">
+        <label style="cursor:pointer;padding:0.45rem 0.8rem;background:var(--panel);
+                      border:1px solid var(--border);border-radius:var(--radius);font-size:0.85rem">
+          Choose CSV…
+          <input type="file" name="file" accept=".csv" required style="display:none"
+                 onchange="this.form.querySelector('.import-btn').disabled=!this.files.length;
+                           this.form.querySelector('.csv-filename').textContent=this.files[0]?this.files[0].name:''">
+        </label>
+        <span class="csv-filename" style="color:var(--muted);font-size:0.82rem"></span>
+        <button class="btn import-btn" type="submit" disabled>Import</button>
+      </form>
+    </div>
+    <div id="sync-status-cyc"></div>
+
     <div class="stat-cards">
       <div class="stat-card">
         <div class="stat-value" id="cyc-rides">—</div>
@@ -742,8 +766,8 @@
 <!-- ── Mobile bottom nav ───────────────────────────────────────────────── -->
 <nav class="mobile-nav">
   <button class="mobile-tab active" data-tab="dashboard">
-    <span class="mobile-icon">&#128202;</span>
-    <span>Dashboard</span>
+    <span class="mobile-icon">&#127939;</span>
+    <span>Running</span>
   </button>
   <button class="mobile-tab" data-tab="cycling">
     <span class="mobile-icon">&#128692;</span>
@@ -1211,7 +1235,7 @@ document.body.addEventListener('htmx:afterRequest', evt => {
   const url  = evt.detail.requestConfig?.path || '';
   const ok   = evt.detail.successful;
   if (!ok) return;
-  if (url === '/sync' || url.startsWith('/import')) {
+  if (url.startsWith('/sync') || url.startsWith('/import')) {
     // Reset so each tab re-fetches fresh data
     dashReady = false;
     cycReady = false;
