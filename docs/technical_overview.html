@@ -333,8 +333,9 @@
   <div class="cover-tag">Technical Documentation</div>
   <h1>Garmin <span>Coach</span><br>App</h1>
   <p class="cover-sub">
-    A local AI-powered running coach that ingests Garmin data, visualises
-    your training, and generates personalised weekly plans using the Claude API.
+    A local AI-powered endurance coach that ingests Garmin <strong>running and
+    cycling</strong> data, visualises your training, and generates personalised
+    weekly plans using the Claude API.
   </p>
   <div class="cover-meta">
     <div class="cover-meta-item">
@@ -347,7 +348,7 @@
     </div>
     <div class="cover-meta-item">
       <span class="cover-meta-label">Version</span>
-      <span class="cover-meta-value">1.0</span>
+      <span class="cover-meta-value">2.0 · multi-sport</span>
     </div>
   </div>
   <div class="cover-badge-row">
@@ -396,19 +397,20 @@
     stays on your machine.
   </p>
   <p>
-    In one sentence: it ingests your Garmin running data, stores it permanently, visualises
-    your training history, and uses the Claude AI to generate personalised weekly plans and
-    answer coaching questions.
+    In one sentence: it ingests your Garmin running <em>and cycling</em> data, stores it
+    permanently, visualises your training history per sport, and uses the Claude AI to
+    generate personalised weekly plans and answer coaching questions.
   </p>
 
   <h3>Core capabilities</h3>
   <ul>
-    <li><strong>Data ingestion</strong> — imports Garmin CSV exports (manual) or automates the export via a real Chrome browser (one-click sync)</li>
+    <li><strong>Multi-sport data ingestion</strong> — imports Garmin CSV exports (manual) or automates the export via a real Chrome browser; one sync session pulls both running and cycling</li>
     <li><strong>Deduplication</strong> — importing the same file twice never creates duplicate entries</li>
-    <li><strong>Dashboard</strong> — weekly mileage bar chart, pace trend, heart rate trend, personal records</li>
-    <li><strong>AI weekly plans</strong> — generates a structured 7-day training plan based on your actual stats and goals</li>
-    <li><strong>AI coaching chat</strong> — conversational interface with real-time context from your runs</li>
-    <li><strong>Goals tracking</strong> — CRUD interface for race targets and training goals</li>
+    <li><strong>Running tab</strong> — weekly mileage, pace trend, heart-rate trend, personal records</li>
+    <li><strong>Cycling tab</strong> — weekly distance, speed trend, heart-rate trend (kept fully separate from running so neither pollutes the other)</li>
+    <li><strong>AI weekly plans</strong> — generates a structured 7-day plan, or turns a plan you paste from the coach chat into a saved Mon–Sun calendar</li>
+    <li><strong>AI coaching chat</strong> — streaming conversation with real-time context from your activities</li>
+    <li><strong>Goals &amp; fitness tracking</strong> — race targets plus an aerobic-efficiency trend (speed ÷ heart rate over time)</li>
   </ul>
 
   <div class="callout blue">
@@ -416,7 +418,7 @@
     <div>
       <strong>Why local?</strong> Garmin does not offer a public API for personal use.
       Running locally means no cloud fees, no third-party data sharing, and no rate limits.
-      Your 859 runs and all AI responses stay on your machine.
+      Your 873 runs, 280 rides, and all AI responses stay on your machine.
     </div>
   </div>
 </div>
@@ -443,20 +445,20 @@
       <div class="arch-title">frontend/index.html — Single Page Application</div>
       <div class="arch-row">
         <div class="arch-box" style="background:#0f1117">
-          <span class="blue">📊 Dashboard</span><br>
-          <span class="muted" style="font-size:0.72rem">Chart.js charts<br>4 stat cards</span>
+          <span class="blue">🏃 Running</span><br>
+          <span class="muted" style="font-size:0.72rem">Sync Running<br>mileage·pace·HR·PRs</span>
         </div>
         <div class="arch-box" style="background:#0f1117">
-          <span class="blue">🏃 Activities</span><br>
-          <span class="muted" style="font-size:0.72rem">run table<br>CSV import</span>
+          <span class="blue">🚴 Cycling</span><br>
+          <span class="muted" style="font-size:0.72rem">Sync from Garmin<br>distance·speed·HR</span>
         </div>
         <div class="arch-box" style="background:#0f1117">
           <span class="blue">📅 Plan</span><br>
-          <span class="muted" style="font-size:0.72rem">weekly cards<br>generate/accept</span>
+          <span class="muted" style="font-size:0.72rem">generate / paste<br>→ week calendar</span>
         </div>
         <div class="arch-box" style="background:#0f1117">
           <span class="blue">🎯 Goals</span><br>
-          <span class="muted" style="font-size:0.72rem">race targets<br>CRUD</span>
+          <span class="muted" style="font-size:0.72rem">race targets<br>aerobic efficiency</span>
         </div>
         <div class="arch-box" style="background:#0f1117">
           <span class="blue">💬 Coach</span><br>
@@ -471,8 +473,8 @@
     <div class="arch-box">
       <div class="arch-title">backend/ — Route modules + business logic</div>
       <div class="arch-row">
-        <div class="arch-box" style="background:#0f1117"><span class="green">activities.py</span><br><span class="muted" style="font-size:0.72rem">/sync /import /activities</span></div>
-        <div class="arch-box" style="background:#0f1117"><span class="green">stats.py</span><br><span class="muted" style="font-size:0.72rem">/stats/weekly-mileage etc.</span></div>
+        <div class="arch-box" style="background:#0f1117"><span class="green">activities.py</span><br><span class="muted" style="font-size:0.72rem">/sync · /sync/running · /import</span></div>
+        <div class="arch-box" style="background:#0f1117"><span class="green">stats.py</span><br><span class="muted" style="font-size:0.72rem">/stats + /stats/cycling</span></div>
         <div class="arch-box" style="background:#0f1117"><span class="green">plans.py</span><br><span class="muted" style="font-size:0.72rem">/plans/generate</span></div>
         <div class="arch-box" style="background:#0f1117"><span class="green">chat.py</span><br><span class="muted" style="font-size:0.72rem">/chat (streaming)</span></div>
       </div>
@@ -489,7 +491,7 @@
     <div class="arch-row">
       <div class="arch-box" style="flex:2">
         <div class="arch-title">PostgreSQL Database</div>
-        <span class="green">activities</span> &nbsp;|&nbsp; <span class="green">goals</span> &nbsp;|&nbsp; <span class="green">weekly_plans</span>
+        <span class="green">activities</span> <span class="muted" style="font-size:0.72rem">(running + cycling)</span> &nbsp;|&nbsp; <span class="green">goals</span> &nbsp;|&nbsp; <span class="green">weekly_plans</span>
       </div>
       <div class="arch-box" style="flex:1">
         <div class="arch-title">Anthropic Claude API</div>
@@ -545,11 +547,11 @@ app.<span class="fn">include_router</span>(chat_routes.router)
   <h3>Route modules</h3>
   <table>
     <tr><th>File</th><th>URL prefix</th><th>Responsibility</th></tr>
-    <tr><td><code>routes/activities.py</code></td><td><code>/activities</code>, <code>/sync</code>, <code>/import/csv</code></td><td>List runs, trigger Garmin browser sync, import CSV files</td></tr>
-    <tr><td><code>routes/stats.py</code></td><td><code>/stats/*</code></td><td>JSON data for all dashboard charts (weekly mileage, pace, HR, PRs)</td></tr>
-    <tr><td><code>routes/plans.py</code></td><td><code>/plans/*</code></td><td>Generate, accept, and archive AI weekly training plans</td></tr>
+    <tr><td><code>routes/activities.py</code></td><td><code>/sync</code>, <code>/sync/running</code>, <code>/import/csv</code></td><td>Dual-sport sync, running-only sync, and manual CSV import</td></tr>
+    <tr><td><code>routes/stats.py</code></td><td><code>/stats/*</code>, <code>/stats/cycling/*</code></td><td>JSON for running charts, cycling charts, and aerobic efficiency</td></tr>
+    <tr><td><code>routes/plans.py</code></td><td><code>/plans/*</code></td><td>Generate AI plans, or parse a pasted plan into a saved calendar</td></tr>
     <tr><td><code>routes/goals.py</code></td><td><code>/goals/*</code></td><td>Create, read, update, delete race and training goals</td></tr>
-    <tr><td><code>routes/chat.py</code></td><td><code>/chat</code></td><td>Streaming AI coaching conversation with run context</td></tr>
+    <tr><td><code>routes/chat.py</code></td><td><code>/chat</code></td><td>Streaming AI coaching conversation with activity context</td></tr>
   </table>
 
   <div class="callout orange">
@@ -597,16 +599,18 @@ _pool = <span class="cl">ConnectionPool</span>(
   <h3>The three tables</h3>
 
   <div class="code-label">SQL schema (simplified)</div>
-  <pre><span class="cm">-- Every run you have ever recorded.</span>
+  <pre><span class="cm">-- Every run AND ride you have ever recorded — one table, one discriminator.</span>
 <span class="kw">CREATE TABLE</span> <span class="cl">activities</span> (
     id                  BIGINT <span class="kw">PRIMARY KEY</span>,
     start_local         TEXT,          <span class="cm">-- "2026-06-04 07:32:00"</span>
     start_minute        TEXT <span class="kw">UNIQUE</span>,  <span class="cm">-- deduplication key</span>
     distance_km         NUMERIC,
     duration_min        NUMERIC,
-    avg_pace_min_per_km NUMERIC,
+    avg_pace_min_per_km NUMERIC,       <span class="cm">-- running metric (min/km)</span>
+    avg_speed_kmh       NUMERIC,       <span class="cm">-- cycling metric (km/h)</span>
     avg_hr              INTEGER,
     vo2max              NUMERIC,
+    activity_type       TEXT,          <span class="cm">-- 'running' | 'cycling'  ← the router</span>
     raw_json            JSONB          <span class="cm">-- full original data preserved</span>
 );
 
@@ -650,11 +654,22 @@ _pool = <span class="cl">ConnectionPool</span>(
   <div class="callout green">
     <span class="callout-icon">✅</span>
     <div>
-      <strong>Result:</strong> You imported 13 CSVs containing 4,540 total rows across overlapping
-      date ranges. The dedup system reduced those to 825 genuinely new runs — no duplicates,
-      no data loss.
+      <strong>Result:</strong> Importing many overlapping CSVs (thousands of rows across two years)
+      collapses to exactly the genuinely-new activities — currently 873 runs + 280 rides — with
+      no duplicates and no data loss.
     </div>
   </div>
+
+  <h3>One table, two sports — the discriminator pattern</h3>
+  <p>
+    Running and cycling share the same shape (distance, duration, HR, calories, elevation), so
+    they live in <strong>one</strong> <code>activities</code> table. The only field that differs —
+    pace (min/km) vs speed (km/h) — gets its own column, and a single <code>activity_type</code>
+    column routes each row. Every running query carries
+    <code>WHERE activity_type = 'running'</code> and every cycling query
+    <code>= 'cycling'</code>, so the two sports are fully isolated in the UI while sharing all the
+    storage, dedup, and import machinery.
+  </p>
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════
@@ -667,32 +682,45 @@ _pool = <span class="cl">ConnectionPool</span>(
   </div>
 
   <p>
-    Garmin exports CSVs in different formats depending on your account language.
-    The importer auto-detects the locale and applies the right parser for each field.
+    Garmin exports CSVs in several shapes depending on language <em>and</em> on whether the file
+    was re-saved through (Greek) Excel. The importer detects the actual <strong>number/date
+    format from the data itself</strong> — not from the header language — then categorises each
+    row as running or cycling.
   </p>
 
   <table>
-    <tr><th>Feature</th><th>English export</th><th>Greek export</th></tr>
-    <tr><td>Column delimiter</td><td><code>,</code></td><td><code>;</code></td></tr>
-    <tr><td>Decimal separator</td><td><code>4.5</code> km</td><td><code>4,5</code> km</td></tr>
-    <tr><td>Date format</td><td><code>2026-06-04 07:32:19</code></td><td><code>4/6/2026 7:32</code></td></tr>
-    <tr><td>Pace format</td><td><code>5:30</code> (MM:SS)</td><td><code>5:30:00 πμ</code> (Excel time-of-day)</td></tr>
-    <tr><td>Headers</td><td>English text</td><td>Greek Unicode characters</td></tr>
+    <tr><th>Feature</th><th>Raw export (EN or GR)</th><th>Greek-Excel re-save</th></tr>
+    <tr><td>Decimal separator</td><td><code>14.32</code> (period)</td><td><code>14,32</code> (comma)</td></tr>
+    <tr><td>Date format</td><td><code>2026-06-11 17:37:51</code> (ISO)</td><td><code>11/6/2026 17:37</code></td></tr>
+    <tr><td>Time format</td><td><code>00:35:07</code> (clean)</td><td><code>5:30:00 πμ</code> (time-of-day + πμ/μμ)</td></tr>
+    <tr><td>Sport metric</td><td colspan="2">running → <code>Μέσος ρυθμός</code> (pace) · cycling → <code>Μέση ταχύτητα</code> (speed)</td></tr>
   </table>
 
-  <div class="code-label">backend/csv_importer.py — locale detection</div>
-  <pre><span class="kw">def</span> <span class="fn">_is_greek_locale</span>(headers):
-    <span class="cm"># Check if any header contains a Greek Unicode character (range Ͱ–Ͽ)</span>
-    <span class="kw">return</span> <span class="fn">any</span>(
-        <span class="fn">any</span>(<span class="st">"Ͱ"</span> &lt;= ch &lt;= <span class="st">"Ͽ"</span> <span class="kw">for</span> ch <span class="kw">in</span> h) <span class="kw">for</span> h <span class="kw">in</span> headers
-    )
+  <div class="callout orange">
+    <span class="callout-icon">⚠️</span>
+    <div>
+      <strong>The trap we avoided:</strong> the cycling file had <em>Greek headers</em> but
+      <em>ISO/period</em> numbers. The old header-based detection would have read <code>14.32</code> km
+      as <code>1432</code> km. Detecting the format from the values fixes this.
+    </div>
+  </div>
 
-<span class="kw">def</span> <span class="fn">_parse_duration_greek</span>(text):
-    <span class="cm"># Greek Garmin exports store pace as Excel time-of-day: "5:30:00 πμ"</span>
-    <span class="cm"># πμ = AM, μμ = PM. We strip the suffix and read only MM:SS.</span>
-    text = text.<span class="fn">replace</span>(<span class="st">" πμ"</span>, <span class="st">""</span>).<span class="fn">replace</span>(<span class="st">" μμ"</span>, <span class="st">""</span>)
-    parts = text.<span class="fn">split</span>(<span class="st">":"</span>)
-    <span class="kw">return</span> <span class="fn">int</span>(parts[<span class="nm">0</span>]) + <span class="fn">int</span>(parts[<span class="nm">1</span>]) / <span class="nm">60</span>  <span class="cm"># decimal minutes</span></pre>
+  <div class="code-label">backend/csv_importer.py — format detection from data + sport routing</div>
+  <pre><span class="kw">def</span> <span class="fn">_detect_excel_greek</span>(rows, header_info):
+    <span class="cm"># Look at the actual values, not the header language.</span>
+    <span class="kw">for</span> row <span class="kw">in</span> rows:
+        <span class="cm"># πμ/μμ in a time field ⇒ Excel re-save (comma decimals)</span>
+        <span class="kw">if</span> <span class="fn">any</span>(ch <span class="kw">in</span> time_value <span class="kw">for</span> ch <span class="kw">in</span> (<span class="st">"π"</span>, <span class="st">"μ"</span>)): <span class="kw">return</span> <span class="kw">True</span>
+        <span class="kw">if</span> date_value.<span class="fn">startswith</span>(<span class="st">"20"</span>):  <span class="cm"># ISO date ⇒ raw export</span>
+            <span class="kw">return</span> <span class="kw">False</span>
+    <span class="kw">return</span> <span class="kw">False</span>
+
+<span class="kw">def</span> <span class="fn">_activity_category</span>(activity_type):
+    <span class="cm"># 'Ποδηλασία' / 'Cycling' → cycling ; 'Τρέξιμο' / 'Running' → running</span>
+    t = activity_type.<span class="fn">lower</span>()
+    <span class="kw">if</span> <span class="st">"ποδηλασ"</span> <span class="kw">in</span> t <span class="kw">or</span> <span class="st">"cycling"</span> <span class="kw">in</span> t: <span class="kw">return</span> <span class="st">"cycling"</span>
+    <span class="kw">if</span> <span class="st">"τρέξιμο"</span> <span class="kw">in</span> t <span class="kw">or</span> <span class="st">"running"</span> <span class="kw">in</span> t: <span class="kw">return</span> <span class="st">"running"</span>
+    <span class="kw">return</span> <span class="kw">None</span>  <span class="cm"># skip swims, walks, etc.</span></pre>
 
   <h3>Synthetic IDs</h3>
   <p>
@@ -758,6 +786,18 @@ context.<span class="fn">add_init_script</span>(
     <span class="st">"Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"</span>
 )</pre>
 
+  <div class="callout blue">
+    <span class="callout-icon">🔀</span>
+    <div>
+      <strong>Two sync buttons, one engine.</strong> <code>export_activities(sports)</code> exports a
+      CSV for each requested sport in a <em>single</em> browser session. The Running tab's
+      <strong>Sync Running</strong> button asks for <code>["running"]</code> (fast); the Cycling
+      tab's <strong>Sync from Garmin</strong> asks for <code>["running", "cycling"]</code>. The first
+      sport exports with no extra page reload; only <em>switching</em> to the second sport's filter
+      pays the reload cost — so single-sport syncs stay quick.
+    </div>
+  </div>
+
   <h3>The full sync flow</h3>
   <div class="flow">
     <div class="flow-step">
@@ -784,22 +824,22 @@ context.<span class="fn">add_init_script</span>(
     <div class="flow-step">
       <div class="flow-left"><div class="flow-dot purple">4</div><div class="flow-line"></div></div>
       <div class="flow-content">
-        <strong>Wait for "Εξαγωγή σε CSV" button (up to 45 seconds)</strong>
-        <span>Garmin Connect is a heavy React app — it takes time to render. We poll for the button instead of assuming the page is ready.</span>
+        <strong>Export the first sport (running)</strong>
+        <span>Poll up to 45 s for the "Εξαγωγή σε CSV" button (Garmin's React app is slow to render), click it, capture the download → <code>garmin_sync_running_&lt;timestamp&gt;.csv</code>.</span>
       </div>
     </div>
     <div class="flow-step">
       <div class="flow-left"><div class="flow-dot red">5</div><div class="flow-line"></div></div>
       <div class="flow-content">
-        <strong>Click export → capture download → save to <code>data/CSVs/garmin_sync_YYYY-MM-DD_HHMM.csv</code></strong>
-        <span>Playwright intercepts the file download before it hits the browser's Downloads folder and saves it directly to our data directory.</span>
+        <strong>Switch to cycling view &amp; export (dual sync only)</strong>
+        <span>Navigate to <code>?activityType=cycling</code>, wait for the filtered list to load, export → <code>garmin_sync_cycling_&lt;timestamp&gt;.csv</code>. Each sport is wrapped independently, so one failing never breaks the other.</span>
       </div>
     </div>
     <div class="flow-step">
       <div class="flow-left"><div class="flow-dot teal">6</div></div>
       <div class="flow-content">
-        <strong>Auto-import the CSV → show count of new workouts</strong>
-        <span>Counts activities before and after import. The difference is the number of genuinely new runs added.</span>
+        <strong>Auto-import each CSV → show count of new workouts</strong>
+        <span>Counts activities before and after. The difference is the number of genuinely new runs/rides added.</span>
       </div>
     </div>
   </div>
@@ -854,9 +894,9 @@ Their personal records: {personal_records}"""</span>,
   <div class="callout blue">
     <span class="callout-icon">💡</span>
     <div>
-      <strong>Context injection:</strong> Before calling Claude, we fetch your real run data from
+      <strong>Context injection:</strong> Before calling Claude, we fetch your real activity data from
       the database and embed it in the system prompt. Claude is not guessing — it is reasoning
-      about your actual 859 runs, your specific goals, and your real personal records.
+      about your actual 873 runs, your specific goals, and your real personal records.
     </div>
   </div>
 
@@ -896,6 +936,15 @@ Athlete context:
 match = re.<span class="fn">search</span>(<span class="st">r'\{.*\}'</span>, response, re.DOTALL)
 plan = json.<span class="fn">loads</span>(match.<span class="fn">group</span>())</pre>
 
+  <h3>Paste-a-plan → calendar</h3>
+  <p>
+    The same structured-output trick powers a second flow: paste any free-text plan the coach
+    wrote in the chat into the Training Plan tab, and <code>POST /plans/parse</code> sends it to
+    Claude with a "convert this to the 7-day JSON schema" prompt. The result is saved
+    (<code>weekly_plans</code>, tagged <code>source: "chat"</code>) and rendered as a Mon–Sun
+    calendar — turning loose prose into a structured, persistent week.
+  </p>
+
   <h3>Workout badge colours</h3>
   <table>
     <tr><th>Type</th><th>Colour</th><th>What it means</th></tr>
@@ -930,28 +979,26 @@ plan = json.<span class="fn">loads</span>(match.<span class="fn">group</span>())
     the HTML; HTMX handles the swap.
   </p>
 
-  <div class="code-label">Example: the Sync button</div>
-  <pre><span class="cm">&lt;!-- When clicked: POST to /sync, show spinner, put response into #activities-panel --&gt;</span>
+  <div class="code-label">Example: the Running tab's Sync button</div>
+  <pre><span class="cm">&lt;!-- Click: POST /sync/running, show spinner, put the banner in #sync-status-run --&gt;</span>
 &lt;<span class="kw">button</span>
-  <span class="at">hx-post</span>=<span class="st">"/sync"</span>
-  <span class="at">hx-target</span>=<span class="st">"#activities-panel"</span>
+  <span class="at">hx-post</span>=<span class="st">"/sync/running"</span>
+  <span class="at">hx-target</span>=<span class="st">"#sync-status-run"</span>
   <span class="at">hx-indicator</span>=<span class="st">"this"</span>&gt;
-  Sync from Garmin
+  Sync Running
 &lt;/<span class="kw">button</span>&gt;
+&lt;<span class="kw">div</span> <span class="at">id</span>=<span class="st">"sync-status-run"</span>&gt;&lt;/<span class="kw">div</span>&gt;
 
-<span class="cm">&lt;!-- This div auto-loads its content from /activities on page load --&gt;</span>
-&lt;<span class="kw">div</span> <span class="at">id</span>=<span class="st">"activities-panel"</span>
-     <span class="at">hx-get</span>=<span class="st">"/activities?days=30"</span>
-     <span class="at">hx-trigger</span>=<span class="st">"load"</span>&gt;
-  Loading...
-&lt;/<span class="kw">div</span>&gt;</pre>
+<span class="cm">&lt;!-- The Cycling tab is identical but POSTs /sync (both sports) → #sync-status-cyc --&gt;</span></pre>
 
-  <h3>Chart.js — the dashboard charts</h3>
+  <h3>Chart.js — the per-tab charts</h3>
   <p>
-    The four dashboard charts use Chart.js 4.4.3, loaded from a CDN. The browser fetches
-    JSON from five <code>/stats/*</code> endpoints simultaneously using <code>Promise.all()</code>,
-    then renders all charts at once. Charts only initialise when the Dashboard tab is first
-    opened — not on every page load.
+    Charts use Chart.js 4.4.3 from a CDN. Each tab fetches its <code>/stats/*</code> endpoints in
+    parallel with <code>Promise.all()</code> and renders together. Charts are <strong>lazy</strong>
+    — each tab initialises only the first time it's opened (separate <code>dashReady</code> /
+    <code>cycReady</code> / <code>goalsReady</code> flags), so nothing loads until you look at it.
+    Running charts are blue/green; cycling charts are purple, so the two sports read differently
+    at a glance.
   </p>
 
   <div class="code-label">Lazy chart initialisation</div>
@@ -981,7 +1028,7 @@ plan = json.<span class="fn">loads</span>(match.<span class="fn">group</span>())
   <table>
     <tr><th>Screen size</th><th>Navigation</th><th>Charts</th></tr>
     <tr><td>Desktop (&gt; 767px)</td><td>Horizontal tab bar at top</td><td>2 × 2 grid</td></tr>
-    <tr><td>Mobile (&lt; 767px)</td><td>Fixed bottom nav with emoji icons 📊🏃📅🎯💬</td><td>Single column stack</td></tr>
+    <tr><td>Mobile (&lt; 767px)</td><td>Fixed bottom nav with emoji icons 🏃🚴📅🎯💬</td><td>Single column stack</td></tr>
   </table>
 
   <p>
@@ -1008,34 +1055,33 @@ plan = json.<span class="fn">loads</span>(match.<span class="fn">group</span>())
     <h2>Data Flow — End to End</h2>
   </div>
 
-  <h3>When you click "Sync from Garmin"</h3>
+  <h3>When you click "Sync from Garmin" (Cycling tab)</h3>
   <div class="arch">
     <div style="color:#e2e8f0; line-height:2">
-Browser &nbsp;<span style="color:#546e7a">→</span> <span style="color:#82aaff">POST /sync</span><br>
-&nbsp;&nbsp;<span style="color:#546e7a">→</span> <span style="color:#ffd580">garmin_playwright.export_csv()</span><br>
+Browser &nbsp;<span style="color:#546e7a">→</span> <span style="color:#82aaff">POST /sync</span> &nbsp;<span style="color:#546e7a">(Running tab → POST /sync/running)</span><br>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> <span style="color:#ffd580">garmin_playwright.export_activities(["running","cycling"])</span><br>
 &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> Chrome opens with saved session (data/chrome_profile/)<br>
-&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> navigate to connect.garmin.com/app/activities?activityType=running<br>
 &nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> <span style="color:#f07178">if not logged in:</span> wait up to 5 min for you to log in<br>
-&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> wait up to 45s for "Εξαγωγή σε CSV" button to appear<br>
-&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> click button → download captured → saved as garmin_sync_2026-06-07_1430.csv<br>
-&nbsp;&nbsp;<span style="color:#546e7a">→</span> <span style="color:#ffd580">csv_importer.import_csv_file(path)</span><br>
-&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> detect locale (Greek or English)<br>
-&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> parse rows → generate synthetic IDs → upsert into PostgreSQL<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> export running view → garmin_sync_running_&lt;ts&gt;.csv<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> switch to ?activityType=cycling → garmin_sync_cycling_&lt;ts&gt;.csv<br>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> <span style="color:#ffd580">csv_importer.import_csv_file(path)</span> for each CSV<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> detect format from data → categorise running/cycling<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> synthetic IDs → upsert into PostgreSQL (deduped)<br>
 &nbsp;&nbsp;<span style="color:#546e7a">→</span> <span style="color:#c3e88d">count_after - count_before</span> = new workouts added<br>
-&nbsp;&nbsp;<span style="color:#546e7a">→</span> return HTML banner + refreshed table<br>
-Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">"Added 3 new workouts from Garmin"</span> + updated table
+Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">"Added 2 new workouts (running + cycling)"</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> htmx:afterRequest listener re-renders the open tab's charts
     </div>
   </div>
 
-  <h3>When you open the Dashboard</h3>
+  <h3>When you open the Running tab</h3>
   <div class="arch">
     <div style="color:#e2e8f0; line-height:2">
 Browser <span style="color:#82aaff">→ fetch('/stats/summary')</span> &nbsp;&nbsp;&nbsp;&nbsp;→ 4 totals for stat cards<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#82aaff">→ fetch('/stats/weekly-mileage')</span> → bar chart labels + values<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#82aaff">→ fetch('/stats/pace-trend')</span> &nbsp;&nbsp;&nbsp;→ line chart dates + paces<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#82aaff">→ fetch('/stats/hr-trend')</span> &nbsp;&nbsp;&nbsp;&nbsp;→ HR line chart data + paces<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#82aaff">→ fetch('/stats/weekly-mileage')</span> → bar chart<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#82aaff">→ fetch('/stats/pace-trend')</span> &nbsp;&nbsp;&nbsp;→ pace line (Y inverted)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#82aaff">→ fetch('/stats/hr-trend')</span> &nbsp;&nbsp;&nbsp;&nbsp;→ HR line<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#82aaff">→ fetch('/stats/prs')</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ fastest 5k / 10k / HM / marathon<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">(all 5 run in parallel)</span><br>
+<span style="color:#546e7a">(Cycling tab fetches the parallel <span style="color:#82aaff">/stats/cycling/*</span> set instead)</span><br>
 Chart.js <span style="color:#c3e88d">renders all charts simultaneously</span>
     </div>
   </div>
@@ -1076,9 +1122,9 @@ Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">7 col
 │ &nbsp;&nbsp;├── <span class="file">garmin_playwright.py</span> &nbsp; <span class="note"># browser automation sync via Chrome/Playwright</span><br>
 │ &nbsp;&nbsp;├── <span class="file">sync.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># legacy API sync (kept but unused)</span><br>
 │ &nbsp;&nbsp;└── <span class="dir">routes/</span><br>
-│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">activities.py</span> &nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /activities /sync /import/csv</span><br>
-│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">stats.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /stats/* — JSON for all dashboard charts</span><br>
-│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">plans.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /plans/* — AI weekly plan generation</span><br>
+│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">activities.py</span> &nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /sync (both) /sync/running /import/csv</span><br>
+│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">stats.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /stats/* running + /stats/cycling/* + aerobic eff.</span><br>
+│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">plans.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /plans/* — AI generate + paste→calendar parse</span><br>
 │ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">goals.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /goals/* — CRUD for race targets</span><br>
 │ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="file">chat.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /chat — streaming AI coaching conversation</span><br>
 ├── <span class="dir">frontend/</span><br>
@@ -1150,8 +1196,9 @@ Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">7 col
   <div class="callout green">
     <span class="callout-icon">📊</span>
     <div>
-      <strong>Scale as of June 2026:</strong> 859 runs · 3,949 km of data spanning May 2024 – June 2026 (25 months).
-      Imported from 13 CSVs across multiple overlapping date ranges. Zero duplicates.
+      <strong>Scale as of June 2026:</strong> 873 runs (~3,993 km) + 280 rides (~2,394 km) spanning
+      May 2024 – June 2026. Imported from many overlapping CSV exports across two sports — zero
+      duplicates, running and cycling fully isolated.
     </div>
   </div>
 </div>
