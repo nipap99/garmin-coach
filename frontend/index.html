@@ -641,42 +641,60 @@
               hx-post="/sync/sleep"
               hx-target="#sync-status-sleep"
               hx-indicator="this"
-              title="Exports your weekly sleep CSV from Garmin. Opens a browser — log in if prompted.">
+              title="Exports last night's detailed sleep from Garmin. Opens a browser — log in if prompted.">
         Sync Sleep
       </button>
     </div>
     <div id="sync-status-sleep"></div>
 
+    <!-- Nightly detail (last 30 nights) -->
     <div class="stat-cards">
       <div class="stat-card">
-        <div class="stat-value" id="slp-score">—</div>
-        <div class="stat-label">Avg Sleep Score</div>
+        <div class="stat-value" id="slpn-score">—</div>
+        <div class="stat-label">Avg Score (30d)</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value" id="slp-duration">—</div>
+        <div class="stat-value" id="slpn-duration">—</div>
         <div class="stat-label">Avg Duration</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value" id="slp-need">—</div>
-        <div class="stat-label">Avg Sleep Need</div>
+        <div class="stat-value" id="slpn-deep">—</div>
+        <div class="stat-label">Avg Deep Sleep</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value" id="slp-weeks">—</div>
-        <div class="stat-label">Weeks Tracked</div>
+        <div class="stat-value" id="slpn-hrv">—</div>
+        <div class="stat-label">Avg HRV (ms)</div>
       </div>
     </div>
 
     <div class="charts-grid">
       <div class="chart-card">
-        <h3>Sleep Score <span style="font-weight:400;text-transform:none;letter-spacing:0">(higher = better)</span></h3>
+        <h3>Sleep Stages <span style="font-weight:400;text-transform:none;letter-spacing:0">(deep · light · REM, hours)</span></h3>
+        <canvas id="chart-slpn-stages"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Sleep Score <span style="font-weight:400;text-transform:none;letter-spacing:0">(per night)</span></h3>
+        <canvas id="chart-slpn-score"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>HRV <span style="font-weight:400;text-transform:none;letter-spacing:0">(overnight, ms — higher = more recovered)</span></h3>
+        <canvas id="chart-slpn-hrv"></canvas>
+      </div>
+    </div>
+
+    <!-- Long-term weekly trend (backdrop) -->
+    <div class="section-heading" style="margin-top:2rem">Weekly trend (long-term)</div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Sleep Score <span style="font-weight:400;text-transform:none;letter-spacing:0">(weekly avg)</span></h3>
         <canvas id="chart-slp-score"></canvas>
       </div>
       <div class="chart-card">
-        <h3>Duration vs Need <span style="font-weight:400;text-transform:none;letter-spacing:0">(hours slept vs needed)</span></h3>
+        <h3>Duration vs Need <span style="font-weight:400;text-transform:none;letter-spacing:0">(weekly, hours)</span></h3>
         <canvas id="chart-slp-duration"></canvas>
       </div>
       <div class="chart-card">
-        <h3>Bedtime &amp; Wake <span style="font-weight:400;text-transform:none;letter-spacing:0">(consistency)</span></h3>
+        <h3>Bedtime &amp; Wake <span style="font-weight:400;text-transform:none;letter-spacing:0">(weekly)</span></h3>
         <canvas id="chart-slp-timing"></canvas>
       </div>
     </div>
@@ -1294,15 +1312,86 @@ async function initSleep() {
   sleepReady = true;
 
   try {
-    const [summary, t] = await Promise.all([
-      fetch('/stats/sleep/summary').then(r => r.json()),
+    const [nsum, nights, t] = await Promise.all([
+      fetch('/stats/sleep/nights/summary').then(r => r.json()),
+      fetch('/stats/sleep/nights').then(r => r.json()),
       fetch('/stats/sleep/trend').then(r => r.json()),
     ]);
 
-    document.getElementById('slp-score').textContent    = summary.avg_score || '—';
-    document.getElementById('slp-duration').textContent = summary.avg_duration_fmt || '—';
-    document.getElementById('slp-need').textContent     = summary.avg_need_fmt || '—';
-    document.getElementById('slp-weeks').textContent    = summary.weeks_tracked || 0;
+    Object.keys(_slpCharts).forEach(k => { if (_slpCharts[k]) { _slpCharts[k].destroy(); delete _slpCharts[k]; } });
+
+    // ── Nightly stat cards (last 30 nights) ──
+    document.getElementById('slpn-score').textContent    = nsum.avg_score || '—';
+    document.getElementById('slpn-duration').textContent = nsum.avg_duration_fmt || '—';
+    document.getElementById('slpn-deep').textContent     = nsum.avg_deep_fmt || '—';
+    document.getElementById('slpn-hrv').textContent      = nsum.avg_hrv_ms || '—';
+
+    // ── Nightly charts ──
+    if (nights.labels && nights.labels.length) {
+      // Sleep stages (stacked bar: deep / light / REM)
+      _slpCharts.stages = new Chart(document.getElementById('chart-slpn-stages'), {
+        type: 'bar',
+        data: {
+          labels: nights.labels,
+          datasets: [
+            { label: 'Deep',  data: nights.deep_h,  backgroundColor: '#4c3fb0' },
+            { label: 'Light', data: nights.light_h, backgroundColor: '#9b8cf0' },
+            { label: 'REM',   data: nights.rem_h,   backgroundColor: '#c39bd3' },
+          ],
+        },
+        options: {
+          ...CHART_BASE,
+          plugins: { ...CHART_BASE.plugins,
+            legend: { display: true, labels: { color: '#98a2b3', font: { size: 10 }, boxWidth: 12 } },
+            tooltip: { ...CHART_BASE.plugins.tooltip, callbacks: {
+              label: ctx => {
+                const f = ctx.dataset.label === 'Deep' ? nights.deep_fmt
+                        : ctx.dataset.label === 'Light' ? nights.light_fmt : nights.rem_fmt;
+                return ctx.dataset.label + ' ' + f[ctx.dataIndex];
+              } } } },
+          scales: {
+            x: { ...CHART_BASE.scales.x, stacked: true },
+            y: { ...CHART_BASE.scales.y, stacked: true, beginAtZero: true,
+                 ticks: { ...CHART_BASE.scales.y.ticks, callback: v => v + 'h' } },
+          },
+        },
+      });
+
+      // Sleep score per night
+      _slpCharts.nscore = new Chart(document.getElementById('chart-slpn-score'), {
+        type: 'line',
+        data: { labels: nights.labels, datasets: [{
+          data: nights.scores, borderColor: SLP, backgroundColor: 'rgba(108,109,231,0.10)',
+          tension: 0.35, fill: true, pointRadius: 2, pointHoverRadius: 5,
+          pointBackgroundColor: SLP, spanGaps: true,
+        }] },
+        options: {
+          ...CHART_BASE,
+          plugins: { ...CHART_BASE.plugins, tooltip: { ...CHART_BASE.plugins.tooltip,
+            callbacks: { label: ctx => 'Score ' + ctx.raw } } },
+          scales: { ...CHART_BASE.scales,
+            y: { ...CHART_BASE.scales.y, suggestedMin: 40, suggestedMax: 100 } },
+        },
+      });
+
+      // HRV per night
+      _slpCharts.hrv = new Chart(document.getElementById('chart-slpn-hrv'), {
+        type: 'line',
+        data: { labels: nights.labels, datasets: [{
+          data: nights.hrv, borderColor: '#17a2b8', backgroundColor: 'rgba(23,162,184,0.10)',
+          tension: 0.35, fill: true, pointRadius: 2, pointHoverRadius: 5,
+          pointBackgroundColor: '#17a2b8', spanGaps: true,
+        }] },
+        options: {
+          ...CHART_BASE,
+          plugins: { ...CHART_BASE.plugins, tooltip: { ...CHART_BASE.plugins.tooltip,
+            callbacks: { label: ctx => ctx.raw + ' ms' } } },
+          scales: { ...CHART_BASE.scales,
+            y: { ...CHART_BASE.scales.y, beginAtZero: false,
+                 ticks: { ...CHART_BASE.scales.y.ticks, callback: v => v + ' ms' } } },
+        },
+      });
+    }
 
     if (!t.labels || !t.labels.length) return;
 

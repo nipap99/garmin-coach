@@ -82,8 +82,8 @@ CREATE TABLE IF NOT EXISTS weekly_plans (
     created_at  TEXT NOT NULL
 );
 
--- Weekly sleep summaries from Garmin's sleep CSV export (7-day view).
--- Sleep is not an activity, so it lives in its own table keyed by week.
+-- Weekly sleep summaries from Garmin's sleep CSV export (1-year view).
+-- Kept as the long-term trend backdrop.
 CREATE TABLE IF NOT EXISTS sleep_weeks (
     week_start        TEXT PRIMARY KEY,   -- ISO date of the week's first day
     week_label        TEXT,               -- original label, e.g. "Μάι. 18-24"
@@ -94,6 +94,31 @@ CREATE TABLE IF NOT EXISTS sleep_weeks (
     avg_bedtime       TEXT,               -- 24h "HH:MM"
     avg_wake_time     TEXT,               -- 24h "HH:MM"
     synced_at         TEXT NOT NULL
+);
+
+-- Per-night sleep detail from Garmin's 1-day sleep CSV export. Captures the
+-- stage breakdown (deep/light/REM) and recovery metrics not in the weekly file.
+CREATE TABLE IF NOT EXISTS sleep_nights (
+    night_date          TEXT PRIMARY KEY,  -- ISO date the sleep ended
+    score               INTEGER,
+    quality             TEXT,
+    duration_min        DOUBLE PRECISION,
+    deep_min            DOUBLE PRECISION,
+    light_min           DOUBLE PRECISION,
+    rem_min             DOUBLE PRECISION,
+    awake_min           DOUBLE PRECISION,
+    stress_avg          INTEGER,
+    restless_moments    INTEGER,
+    overnight_hr        INTEGER,           -- avg HR during sleep
+    resting_hr          INTEGER,
+    body_battery_change INTEGER,
+    spo2_avg            INTEGER,
+    spo2_low            INTEGER,
+    respiration_avg     DOUBLE PRECISION,
+    respiration_low     DOUBLE PRECISION,
+    hrv_ms              INTEGER,
+    hrv_status          TEXT,
+    synced_at           TEXT NOT NULL
 );
 """
 
@@ -735,6 +760,76 @@ def get_sleep_summary() -> dict[str, Any]:
                 ROUND(AVG(avg_duration_min)::numeric, 0)       AS avg_duration_min,
                 ROUND(AVG(avg_need_min)::numeric, 0)           AS avg_need_min
             FROM sleep_weeks
+            """,
+        ).fetchone()
+    return dict(row) if row else {}
+
+
+# ── Per-night sleep ──────────────────────────────────────────────────────────
+
+_SLEEP_NIGHT_COLS = (
+    "night_date", "score", "quality", "duration_min", "deep_min", "light_min",
+    "rem_min", "awake_min", "stress_avg", "restless_moments", "overnight_hr",
+    "resting_hr", "body_battery_change", "spo2_avg", "spo2_low",
+    "respiration_avg", "respiration_low", "hrv_ms", "hrv_status",
+)
+
+
+def upsert_sleep_night(rec: dict[str, Any]) -> None:
+    """Insert or update one night's sleep detail, keyed on ``night_date``."""
+    if not rec.get("night_date"):
+        return
+    payload = {c: rec.get(c) for c in _SLEEP_NIGHT_COLS}
+    payload["synced_at"] = datetime.utcnow().isoformat()
+
+    cols = ", ".join(_SLEEP_NIGHT_COLS) + ", synced_at"
+    placeholders = ", ".join(f"%({c})s" for c in _SLEEP_NIGHT_COLS) + ", %(synced_at)s"
+    updates = ", ".join(
+        f"{c} = COALESCE(excluded.{c}, sleep_nights.{c})"
+        for c in _SLEEP_NIGHT_COLS if c != "night_date"
+    )
+    with get_connection() as conn:
+        conn.execute(
+            f"""
+            INSERT INTO sleep_nights ({cols})
+            VALUES ({placeholders})
+            ON CONFLICT (night_date) DO UPDATE SET
+                {updates},
+                synced_at = excluded.synced_at
+            """,
+            payload,
+        )
+
+
+def count_sleep_nights() -> int:
+    with get_connection() as conn:
+        row = conn.execute("SELECT COUNT(*) AS n FROM sleep_nights").fetchone()
+    return int(row["n"]) if row else 0
+
+
+def get_sleep_nights(limit: int = 60) -> list[dict[str, Any]]:
+    """Return the most recent N nights, oldest first (for charts)."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM sleep_nights ORDER BY night_date DESC LIMIT %s",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in reversed(rows)]
+
+
+def get_sleep_nights_summary() -> dict[str, Any]:
+    """Averages over the last 30 nights for the nightly stat cards."""
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                COUNT(*)                                    AS nights_tracked,
+                ROUND(AVG(score)::numeric, 0)               AS avg_score,
+                ROUND(AVG(duration_min)::numeric, 0)        AS avg_duration_min,
+                ROUND(AVG(deep_min)::numeric, 0)            AS avg_deep_min,
+                ROUND(AVG(rem_min)::numeric, 0)             AS avg_rem_min,
+                ROUND(AVG(hrv_ms)::numeric, 0)              AS avg_hrv_ms
+            FROM (SELECT * FROM sleep_nights ORDER BY night_date DESC LIMIT 30) recent
             """,
         ).fetchone()
     return dict(row) if row else {}

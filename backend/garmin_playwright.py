@@ -140,18 +140,20 @@ def _export_one_sport(page, sport: str, navigate: bool = True) -> Path:
     return dest
 
 
-def export_sleep() -> Path:
-    """Open the Garmin sleep page, switch to the 1-year view, and export its
-    weekly CSV.
+_YEAR_VIEW_LABELS = ["1 έτος", "1 year", "1 Year"]
+_DAY_VIEW_LABELS = ["1 ημέρα", "1 day", "1 Day"]
 
-    The sleep export lives behind a "⋮" (more) menu rather than a visible button,
-    so we select the 1-year view (the only one whose export matches our weekly
-    table), open that menu, then click "Εξαγωγή σε CSV". Returns the saved path.
+
+def _export_sleep_view(view_labels: list[str], view_name: str, filename_prefix: str) -> Path:
+    """Open the sleep page, select a range view, open the ⋮ menu, export, save.
+
+    The export *format* depends on the selected range (1-day = per-night detail,
+    1-year = weekly averages), so the view selection matters. Returns the path.
     """
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
     PROFILE_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    dest = DOWNLOAD_DIR / f"garmin_sync_sleep_{timestamp}.csv"
+    dest = DOWNLOAD_DIR / f"{filename_prefix}_{timestamp}.csv"
 
     with sync_playwright() as pw:
         context = _launch_persistent(pw)
@@ -166,7 +168,7 @@ def export_sleep() -> Path:
 
         # No blanket networkidle wait — the locators below auto-wait for their
         # specific elements, which is both faster and more reliable on this SPA.
-        _select_year_view(page)
+        _select_range_view(page, view_labels, view_name)
         export_item = _open_sleep_export_menu(page)
         if export_item is None:
             context.close()
@@ -175,37 +177,42 @@ def export_sleep() -> Path:
                 "have been slow, or its layout changed."
             )
 
-        logger.info("Exporting sleep…")
+        logger.info("Exporting sleep (%s)…", view_name)
         with page.expect_download(timeout=60_000) as dl_handle:
             export_item.click()
         dl_handle.value.save_as(dest)
         logger.info("Sleep CSV saved → %s", dest)
-
         context.close()
 
     return dest
 
 
-_YEAR_VIEW_LABELS = ["1 έτος", "1 year", "1 Year"]
+def export_sleep() -> Path:
+    """Export the weekly (1-year view) sleep CSV — the long-term backdrop."""
+    return _export_sleep_view(_YEAR_VIEW_LABELS, "1-year", "garmin_sync_sleep")
 
 
-def _select_year_view(page) -> bool:
-    """Click the '1 year' range tab. Only this view exports the weekly-aggregate
-    format our importer/table expects (one row per week, "Μάι. 18-24"); the 1-day
-    and 7-day views export per-night rows in a different schema. It also includes
-    the current in-progress week, which is the point of syncing. Waits for the tab
-    to render, then clicks. Returns True if clicked."""
-    for label in _YEAR_VIEW_LABELS:
+def export_sleep_night() -> Path:
+    """Export the per-night (1-day view) sleep CSV — rich nightly detail."""
+    return _export_sleep_view(_DAY_VIEW_LABELS, "1-day", "garmin_sync_sleep_night")
+
+
+def _select_range_view(page, labels: list[str], name: str) -> bool:
+    """Click a range tab (1-day / 1-year). The export *format* depends on the
+    selected range, so this must succeed. The persistent profile remembers the
+    last range, so we always click explicitly. Waits for the tab to render,
+    then clicks. Returns True if clicked."""
+    for label in labels:
         loc = page.get_by_text(label, exact=True)
         try:
             loc.first.wait_for(state="visible", timeout=25_000)
             loc.first.click(timeout=5_000)
-            page.wait_for_timeout(1_500)  # let the yearly/weekly range apply
-            logger.info("Selected 1-year view (%r)", label)
+            page.wait_for_timeout(1_500)  # let the range apply
+            logger.info("Selected %s view (%r)", name, label)
             return True
         except PWTimeoutError:
             continue
-    logger.warning("Could not find the 1-year view tab — export schema may not match")
+    logger.warning("Could not find the %s view tab", name)
     return False
 
 

@@ -60,6 +60,16 @@ def _parse_int(text: str | None) -> int | None:
     return int(m.group()) if m else None
 
 
+def _parse_float(text: str | None) -> float | None:
+    if not text:
+        return None
+    t = text.strip()
+    if t in ("--", "-", ""):
+        return None
+    m = re.search(r"-?\d+(?:[.,]\d+)?", t)
+    return float(m.group().replace(",", ".")) if m else None
+
+
 def _parse_duration(text: str | None) -> float | None:
     """'7ώ 39λεπ.' → 459 minutes. Handles 'λεπ.' and the shorter 'λ'."""
     if not text:
@@ -245,6 +255,73 @@ def import_sleep_csv(path: str | Path) -> int:
 
     logger.info("Imported %d sleep weeks from %s (%s)", n, path.name, encoding)
     return n
+
+
+# ── 1-day (per-night) format ─────────────────────────────────────────────────
+# Garmin's 1-day sleep export is a vertical "key,value" layout for one night,
+# with the stage breakdown the weekly file lacks.
+
+
+def parse_sleep_day(text: str) -> dict[str, Any]:
+    """Parse the vertical 1-day sleep CSV text into one night's record."""
+    d: dict[str, str] = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or "," not in line:
+            continue
+        k, v = line.split(",", 1)
+        k, v = k.strip().lower(), v.strip()
+        if k and k not in d:           # first occurrence wins (duration repeats)
+            d[k] = v
+
+    def g(key: str) -> str | None:
+        return d.get(key)
+
+    return {
+        "night_date":          g("ημερομηνία"),
+        "score":               _parse_int(g("βαθμολογία ύπνου")),
+        "quality":             g("ποιότητα") or None,
+        "duration_min":        _parse_duration(g("διάρκεια ύπνου")),
+        "deep_min":            _parse_duration(g("διάρκεια βαθέος ύπνου")),
+        "light_min":           _parse_duration(g("διάρκεια ελαφρού ύπνου")),
+        "rem_min":             _parse_duration(g("διάρκεια ύπνου rem")),
+        "awake_min":           _parse_duration(g("χρόνος αφύπνισης")),
+        "stress_avg":          _parse_int(g("στρες μέση τιμή")),
+        "restless_moments":    _parse_int(g("στιγμές ανησυχίας")),
+        "overnight_hr":        _parse_int(g("μέσος όρος καρδιακών παλμών στη διάρκεια της νύχτας")),
+        "resting_hr":          _parse_int(g("καρδιακοί παλμοί κατά την ανάπαυση")),
+        "body_battery_change": _parse_int(g("αλλαγή body battery")),
+        "spo2_avg":            _parse_int(g("μεσαίο spo2")),
+        "spo2_low":            _parse_int(g("χαμηλότερο spo2")),
+        "respiration_avg":     _parse_float(g("μέσος ρυθμός αναπνοής")),
+        "respiration_low":     _parse_float(g("χαμηλότερη τιμή αναπνοής")),
+        "hrv_ms":              _parse_int(g("μέσο hrv στη διάρκεια της νύχτας")),
+        "hrv_status":          g("μέσο hrv 7 ημερών") or None,
+    }
+
+
+def import_sleep_day_csv(path: str | Path) -> str:
+    """Parse a Garmin 1-day sleep CSV and upsert the night. Returns its date."""
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"Sleep CSV not found: {path}")
+
+    text: str | None = None
+    for enc in _ENCODINGS:
+        try:
+            text = path.read_text(encoding=enc)
+            break
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+    if text is None:
+        raise UnicodeDecodeError("csv", b"", 0, 1, f"Could not decode {path}")
+
+    rec = parse_sleep_day(text)
+    if not rec.get("night_date"):
+        raise ValueError("No date found in the 1-day sleep CSV.")
+    db.upsert_sleep_night(rec)
+    logger.info("Imported sleep night %s from %s", rec["night_date"], path.name)
+    return rec["night_date"]
 
 
 def main(argv: list[str] | None = None) -> int:

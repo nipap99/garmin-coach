@@ -189,6 +189,41 @@ def sleep_trend(weeks: int = Query(52, ge=4, le=260)):
     }
 
 
+@router.get("/sleep/nights/summary")
+def sleep_nights_summary():
+    """Averages over the last 30 nights for the nightly stat cards."""
+    s = db.get_sleep_nights_summary()
+    return {
+        "nights_tracked":   int(s["nights_tracked"]) if s.get("nights_tracked") else 0,
+        "avg_score":        int(s["avg_score"]) if s.get("avg_score") else 0,
+        "avg_duration_fmt": _fmt_hm(s.get("avg_duration_min")),
+        "avg_deep_fmt":     _fmt_hm(s.get("avg_deep_min")),
+        "avg_hrv_ms":       int(s["avg_hrv_ms"]) if s.get("avg_hrv_ms") else 0,
+    }
+
+
+@router.get("/sleep/nights")
+def sleep_nights(limit: int = Query(60, ge=7, le=400)):
+    """Per-night series for the nightly Sleep charts (stages, score, HRV)."""
+    rows = db.get_sleep_nights(limit=limit)
+
+    def h(v):
+        return round(float(v) / 60, 2) if v else 0
+
+    return {
+        "labels":       [r["night_date"] for r in rows],
+        "deep_h":       [h(r["deep_min"]) for r in rows],
+        "light_h":      [h(r["light_min"]) for r in rows],
+        "rem_h":        [h(r["rem_min"]) for r in rows],
+        "scores":       [r["score"] for r in rows],
+        "hrv":          [r["hrv_ms"] for r in rows],
+        "duration_fmt": [_fmt_hm(r["duration_min"]) for r in rows],
+        "deep_fmt":     [_fmt_hm(r["deep_min"]) for r in rows],
+        "light_fmt":    [_fmt_hm(r["light_min"]) for r in rows],
+        "rem_fmt":      [_fmt_hm(r["rem_min"]) for r in rows],
+    }
+
+
 @router.get("/aerobic-efficiency")
 def aerobic_efficiency():
     """Aerobic efficiency score for each run + weekly averages for the trend line.
