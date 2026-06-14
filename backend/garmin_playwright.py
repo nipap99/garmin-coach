@@ -141,11 +141,12 @@ def _export_one_sport(page, sport: str, navigate: bool = True) -> Path:
 
 
 def export_sleep() -> Path:
-    """Open the Garmin sleep page, ensure the 7-day view, and export its weekly CSV.
+    """Open the Garmin sleep page, switch to the 1-year view, and export its
+    weekly CSV.
 
     The sleep export lives behind a "⋮" (more) menu rather than a visible button,
-    so we select the 7-day view, open that menu, then click "Εξαγωγή σε CSV".
-    Returns the saved CSV path.
+    so we select the 1-year view (the only one whose export matches our weekly
+    table), open that menu, then click "Εξαγωγή σε CSV". Returns the saved path.
     """
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
     PROFILE_DIR.mkdir(parents=True, exist_ok=True)
@@ -163,12 +164,9 @@ def export_sleep() -> Path:
             logger.info("Post-login redirect — returning to sleep page…")
             page.goto(SLEEP_URL, wait_until="domcontentloaded")
 
-        try:
-            page.wait_for_load_state("networkidle", timeout=20_000)
-        except PWTimeoutError:
-            pass
-
-        _select_seven_day_view(page)
+        # No blanket networkidle wait — the locators below auto-wait for their
+        # specific elements, which is both faster and more reliable on this SPA.
+        _select_year_view(page)
         export_item = _open_sleep_export_menu(page)
         if export_item is None:
             context.close()
@@ -188,24 +186,26 @@ def export_sleep() -> Path:
     return dest
 
 
-_SEVEN_DAY_LABELS = ["7 ημέρες", "7 days", "7 Days"]
+_YEAR_VIEW_LABELS = ["1 έτος", "1 year", "1 Year"]
 
 
-def _select_seven_day_view(page) -> bool:
-    """Click the 7-day range tab. The page defaults to the 1-day view, whose
-    export is a different per-night format we can't parse — so this must
-    succeed. Returns True if the tab was clicked."""
-    for label in _SEVEN_DAY_LABELS:
+def _select_year_view(page) -> bool:
+    """Click the '1 year' range tab. Only this view exports the weekly-aggregate
+    format our importer/table expects (one row per week, "Μάι. 18-24"); the 1-day
+    and 7-day views export per-night rows in a different schema. It also includes
+    the current in-progress week, which is the point of syncing. Waits for the tab
+    to render, then clicks. Returns True if clicked."""
+    for label in _YEAR_VIEW_LABELS:
+        loc = page.get_by_text(label, exact=True)
         try:
-            loc = page.get_by_text(label, exact=True)
-            if loc.count() > 0:
-                loc.first.click(timeout=5_000)
-                page.wait_for_timeout(2_000)  # let the weekly view load
-                logger.info("Selected 7-day view (%r)", label)
-                return True
-        except Exception:
+            loc.first.wait_for(state="visible", timeout=25_000)
+            loc.first.click(timeout=5_000)
+            page.wait_for_timeout(1_500)  # let the yearly/weekly range apply
+            logger.info("Selected 1-year view (%r)", label)
+            return True
+        except PWTimeoutError:
             continue
-    logger.warning("Could not find the 7-day view tab — export may be 1-day data")
+    logger.warning("Could not find the 1-year view tab — export schema may not match")
     return False
 
 
@@ -225,37 +225,37 @@ def _find_export_item(page, timeout: int = 1_500):
 def _open_sleep_export_menu(page):
     """Open the ⋮ (more) menu and return the visible 'Export to CSV' item.
 
-    The kebab is an icon button in the top-right of the page header (just after
-    the "?" help icon). We can't target it by text, so we collect the small
-    icon-only buttons in the top region and click them rightmost-first (the ⋮
-    is the right-most one), checking after each click for the export item.
+    The kebab is precisely identifiable: ``<button title="Μενού">`` (Greek) /
+    ``title="Menu"`` (English). We click it directly; only if Garmin changes
+    that marker do we fall back to the positional sweep.
     """
-    # Maybe it's already open / visible
+    for sel in ('button[title="Μενού"]', 'button[title="Menu"]', 'button[title*="ενού"]'):
+        loc = page.locator(sel)
+        try:
+            loc.first.wait_for(state="visible", timeout=10_000)
+        except PWTimeoutError:
+            continue
+        try:
+            loc.first.click(timeout=5_000)
+        except Exception:
+            break
+        item = _find_export_item(page, timeout=5_000)
+        if item is not None:
+            logger.info("Opened sleep menu via title selector")
+            return item
+        _dismiss(page)
+        break  # found the menu button but no export item — go to fallback
+
+    return _open_sleep_export_menu_fallback(page)
+
+
+def _open_sleep_export_menu_fallback(page):
+    """Positional fallback if the ⋮ can't be found by its title marker."""
     item = _find_export_item(page, timeout=1_500)
     if item is not None:
         return item
 
-    # First try the explicit "more menu" attributes, if present
-    for sel in (
-        "button[aria-haspopup='menu']",
-        "button[aria-haspopup='true']",
-        "button[aria-label*='more' i]",
-        "button[aria-label*='menu' i]",
-        "button[aria-label*='επιλογ' i]",
-        "button[aria-label*='περισσότ' i]",
-    ):
-        loc = page.locator(sel)
-        for i in range(min(loc.count(), 3)):
-            try:
-                loc.nth(i).click(timeout=1_500)
-            except Exception:
-                continue
-            item = _find_export_item(page)
-            if item is not None:
-                return item
-            _dismiss(page)
-
-    # Fallback: small icon buttons in the CONTENT header, clicked right-to-left.
+    # Small icon buttons in the CONTENT header, clicked right-to-left.
     # The y-floor excludes the global top app bar (cloud / bell / watch / avatar);
     # the ⋮ sits in the page header just below it, to the right of the "?" icon.
     buttons = page.locator("button, [role='button']")
