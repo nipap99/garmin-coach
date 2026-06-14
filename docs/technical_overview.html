@@ -1326,8 +1326,12 @@ Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">7 col
     <div>
       <strong>Net effect:</strong> the first time you log on each day, a browser quietly opens for
       ~10 seconds, pulls last night's sleep (stages, HRV and all), saves it, and closes — with no
-      action from you. Everything is logged to <code>data/sleep_sync.log</code>, and it's installed
-      or removed with the two PowerShell scripts.
+      action from you. <strong>Every 14 days</strong>, the same session also re-exports the 1-year
+      weekly file so the long-term trend stays current (the nightly file lacks sleep-need and
+      bed/wake times, so the weekly export is the only way to keep those charts alive). Both
+      cadences share one guard each, so nothing ever runs more than it should. Everything is logged
+      to <code>data/sleep_sync.log</code>, and it's installed or removed with the two PowerShell
+      scripts.
     </div>
   </div>
 </div>

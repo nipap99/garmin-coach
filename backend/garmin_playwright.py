@@ -143,18 +143,25 @@ def _export_one_sport(page, sport: str, navigate: bool = True) -> Path:
 _YEAR_VIEW_LABELS = ["1 έτος", "1 year", "1 Year"]
 _DAY_VIEW_LABELS = ["1 ημέρα", "1 day", "1 Day"]
 
+# view key → (range-tab labels, log name, download filename prefix)
+_SLEEP_VIEWS: dict[str, tuple[list[str], str, str]] = {
+    "night":  (_DAY_VIEW_LABELS,  "1-day",  "garmin_sync_sleep_night"),
+    "weekly": (_YEAR_VIEW_LABELS, "1-year", "garmin_sync_sleep"),
+}
 
-def _export_sleep_view(view_labels: list[str], view_name: str, filename_prefix: str) -> Path:
-    """Open the sleep page, select a range view, open the ⋮ menu, export, save.
 
-    The export *format* depends on the selected range (1-day = per-night detail,
-    1-year = weekly averages), so the view selection matters. Returns the path.
+def export_sleep_views(views: list[str]) -> dict[str, Path]:
+    """Export one or more sleep views in a single browser session.
+
+    ``views`` is a subset of ``("night", "weekly")``. Opens the page once, logs
+    in once, then for each requested view flips to its range tab and exports.
+    Each view is wrapped independently, so one failing never aborts the other.
+    Returns ``{view: saved_path}`` for the views that exported OK.
     """
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
     PROFILE_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    dest = DOWNLOAD_DIR / f"{filename_prefix}_{timestamp}.csv"
 
+    saved: dict[str, Path] = {}
     with sync_playwright() as pw:
         context = _launch_persistent(pw)
         page = context.new_page()
@@ -166,35 +173,42 @@ def _export_sleep_view(view_labels: list[str], view_name: str, filename_prefix: 
             logger.info("Post-login redirect — returning to sleep page…")
             page.goto(SLEEP_URL, wait_until="domcontentloaded")
 
-        # No blanket networkidle wait — the locators below auto-wait for their
-        # specific elements, which is both faster and more reliable on this SPA.
-        _select_range_view(page, view_labels, view_name)
-        export_item = _open_sleep_export_menu(page)
-        if export_item is None:
-            context.close()
-            raise RuntimeError(
-                "Could not find the sleep 'Εξαγωγή σε CSV' option. The page may "
-                "have been slow, or its layout changed."
-            )
+        for view in views:
+            labels, name, prefix = _SLEEP_VIEWS[view]
+            try:
+                ts = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+                dest = DOWNLOAD_DIR / f"{prefix}_{ts}.csv"
+                _select_range_view(page, labels, name)
+                item = _open_sleep_export_menu(page)
+                if item is None:
+                    raise RuntimeError(f"Export menu not found for {name}.")
+                logger.info("Exporting sleep (%s)…", name)
+                with page.expect_download(timeout=60_000) as dl_handle:
+                    item.click()
+                dl_handle.value.save_as(dest)
+                saved[view] = dest
+                logger.info("Sleep %s CSV saved → %s", name, dest)
+            except Exception:  # noqa: BLE001 — keep going so one bad view
+                logger.exception("Sleep export failed for %s", view)
 
-        logger.info("Exporting sleep (%s)…", view_name)
-        with page.expect_download(timeout=60_000) as dl_handle:
-            export_item.click()
-        dl_handle.value.save_as(dest)
-        logger.info("Sleep CSV saved → %s", dest)
         context.close()
 
-    return dest
-
-
-def export_sleep() -> Path:
-    """Export the weekly (1-year view) sleep CSV — the long-term backdrop."""
-    return _export_sleep_view(_YEAR_VIEW_LABELS, "1-year", "garmin_sync_sleep")
+    if not saved:
+        raise RuntimeError(
+            "No sleep CSVs were exported. The page may have been slow, or you "
+            "may need to log in."
+        )
+    return saved
 
 
 def export_sleep_night() -> Path:
     """Export the per-night (1-day view) sleep CSV — rich nightly detail."""
-    return _export_sleep_view(_DAY_VIEW_LABELS, "1-day", "garmin_sync_sleep_night")
+    return export_sleep_views(["night"])["night"]
+
+
+def export_sleep() -> Path:
+    """Export the weekly (1-year view) sleep CSV — the long-term backdrop."""
+    return export_sleep_views(["weekly"])["weekly"]
 
 
 def _select_range_view(page, labels: list[str], name: str) -> bool:
