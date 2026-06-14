@@ -1,7 +1,7 @@
-"""Routes for listing activities, triggering a Garmin sync, and importing CSV files.
+"""Routes for triggering a Garmin sync and importing CSV files.
 
-The HTML fragment routes are designed to be swapped into the page by HTMX
-(see frontend/index.html). They return raw HTML, not JSON.
+Both routes return a small HTML status banner that HTMX swaps into the
+dashboard's #sync-status slot (see frontend/index.html).
 """
 from __future__ import annotations
 
@@ -9,95 +9,52 @@ import logging
 import tempfile
 from pathlib import Path
 
-from fastapi import APIRouter, File, Query, UploadFile
+from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import HTMLResponse
 
 from .. import csv_importer, db, garmin_playwright
-from ..garmin_client import _format_pace
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-def _render_activities_table(rows: list[dict]) -> str:
-    """Render the activities table wrapped in its scroll container."""
-    if not rows:
-        return (
-            '<div class="table-scroll panel">'
-            '<div class="empty">'
-            "No activities yet. Click <strong>Sync from Garmin</strong> "
-            "above to pull your recent runs."
-            "</div></div>"
-        )
-
-    header = (
-        '<div class="table-scroll panel"><table>'
-        "<thead><tr>"
-        "<th>Date</th><th>Name</th><th>Distance</th>"
-        "<th>Duration</th><th>Pace</th><th>Avg HR</th><th>VO2max</th>"
-        "</tr></thead><tbody>"
-    )
-    body_rows = []
-    for r in rows:
-        pace = _format_pace(r.get("avg_pace_min_per_km"))
-        body_rows.append(
-            "<tr>"
-            f"<td>{(r.get('start_local') or '')[:16]}</td>"
-            f"<td>{r.get('name') or ''}</td>"
-            f"<td>{r.get('distance_km') or 0:.2f} km</td>"
-            f"<td>{r.get('duration_min') or 0:.1f} min</td>"
-            f"<td>{pace} /km</td>"
-            f"<td>{r.get('avg_hr') or '—'}</td>"
-            f"<td>{r.get('vo2max') or '—'}</td>"
-            "</tr>"
-        )
-    return header + "".join(body_rows) + "</tbody></table></div>"
-
-
-@router.get("/activities", response_class=HTMLResponse)
-def list_activities(days: int = Query(30, ge=1, le=365)) -> HTMLResponse:
-    """Return an HTML fragment with recent activities."""
-    rows = db.get_recent_activities(days=days)
-    return HTMLResponse(_render_activities_table(rows))
-
-
 @router.post("/sync", response_class=HTMLResponse)
-def trigger_sync(days: int = Query(30, ge=1, le=365)) -> HTMLResponse:
-    """Pull recent runs from Garmin into the local DB, then return the refreshed table.
+def trigger_sync() -> HTMLResponse:
+    """Export running + cycling from Garmin (via Playwright) and import them.
 
-    Returns a status banner + the refreshed activities table.
+    Both sports are exported in one browser session, then imported. Returns a
+    status banner reporting how many new workouts were added.
     """
     try:
         count_before = db.count_activities()
-        csv_path = garmin_playwright.export_csv()
-        csv_importer.import_csv_file(csv_path)
+        csv_paths = garmin_playwright.export_activities()  # running + cycling
+        for path in csv_paths:
+            csv_importer.import_csv_file(path)
         new_count = db.count_activities() - count_before
         if new_count == 0:
             msg = "Sync complete — no new workouts (all already in your database)."
         elif new_count == 1:
-            msg = "Added 1 new workout from Garmin."
+            msg = "Added 1 new workout from Garmin (running + cycling)."
         else:
-            msg = f"Added {new_count} new workouts from Garmin."
+            msg = f"Added {new_count} new workouts from Garmin (running + cycling)."
         banner = f'<div class="banner success">{msg}</div>'
     except Exception as e:  # noqa: BLE001 — we want to show any error to the user
         logger.exception("Sync failed")
         banner = f'<div class="banner error">Sync failed: {type(e).__name__}: {e}</div>'
 
-    rows = db.get_recent_activities(days=days)
-    return HTMLResponse(banner + _render_activities_table(rows))
+    return HTMLResponse(banner)
 
 
 @router.post("/import/csv", response_class=HTMLResponse)
 async def import_csv(file: UploadFile = File(...)) -> HTMLResponse:
     """Upload a Garmin CSV export and import the running activities into the DB.
 
-    Returns a status banner + the refreshed activities table.
+    Returns a status banner reporting how many new workouts were added.
     """
     if not file.filename or not file.filename.lower().endswith(".csv"):
         return HTMLResponse(
             '<div class="banner error">Please upload a .csv file.</div>'
-            + _render_activities_table(db.get_recent_activities(days=365))
         )
 
     content = await file.read()
@@ -131,5 +88,4 @@ async def import_csv(file: UploadFile = File(...)) -> HTMLResponse:
         if tmp_path is not None:
             tmp_path.unlink(missing_ok=True)
 
-    rows = db.get_recent_activities(days=365)
-    return HTMLResponse(banner + _render_activities_table(rows))
+    return HTMLResponse(banner)

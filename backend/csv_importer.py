@@ -65,6 +65,8 @@ HEADER_ALIASES: dict[str, str] = {
     "max heart rate": "max_hr",
     "avg pace": "avg_pace_raw",
     "average pace": "avg_pace_raw",
+    "avg speed": "avg_speed_raw",
+    "average speed": "avg_speed_raw",
     "calories": "calories",
     "total ascent": "elevation_gain_m",
     "ascent": "elevation_gain_m",
@@ -80,6 +82,7 @@ HEADER_ALIASES: dict[str, str] = {
     "μέσοι κπ": "avg_hr",
     "μέγιστοι κπ": "max_hr",
     "μέσος ρυθμός": "avg_pace_raw",
+    "μέση ταχύτητα": "avg_speed_raw",
     "θερμίδες": "calories",
     "συνολική άνοδος": "elevation_gain_m",
 }
@@ -106,6 +109,50 @@ RUNNING_TYPES = frozenset(
     }
 )
 
+CYCLING_TYPES = frozenset(
+    {
+        # English
+        "cycling",
+        "road cycling",
+        "indoor cycling",
+        "virtual cycling",
+        "mountain biking",
+        "gravel/unpaved cycling",
+        "cyclocross",
+        "track cycling",
+        "e-biking",
+        "bmx",
+        # Greek
+        "ποδηλασία",
+        "ποδηλασία σε εσωτερικό χώρο",
+        "ποδηλασία δρόμου",
+        "ορεινή ποδηλασία",
+        "εικονική ποδηλασία",
+    }
+)
+
+
+def _activity_category(activity_type: str | None) -> str | None:
+    """Map a raw activity-type label to ``'running'``, ``'cycling'``, or None.
+
+    Tries an exact (normalized) match first, then a keyword fallback so we
+    catch localized variants we did not enumerate (e.g. "Ποδηλασία σε ...").
+    Returns None for activity types we do not track (swims, walks, etc.).
+    """
+    if not activity_type:
+        return None
+    t = activity_type.strip().lower()
+    if t in RUNNING_TYPES:
+        return "running"
+    if t in CYCLING_TYPES:
+        return "cycling"
+    # Keyword fallback for unlisted localized variants
+    if "τρέξιμο" in t or "running" in t or "run" == t:
+        return "running"
+    if "ποδηλασ" in t or "cycling" in t or "biking" in t or "bike" in t:
+        return "cycling"
+    return None
+
 
 # ------------------------------ Detection ---------------------------------
 
@@ -125,6 +172,44 @@ def _is_greek_locale(headers: list[str]) -> bool:
     return any(
         any("Ͱ" <= ch <= "Ͽ" for ch in h) for h in headers
     )
+
+
+def _detect_excel_greek(
+    rows: list[dict[str, str]],
+    header_info: dict[str, tuple[str, str | None]],
+) -> bool:
+    """Detect the *number/date* format from the actual data, not the headers.
+
+    Garmin exports come in two shapes:
+
+    * **Raw export** — period decimals (``14.32``), ISO dates
+      (``2026-06-11 17:37:51``), clean ``HH:MM:SS`` times. Headers may still be
+      Greek, so header language is NOT a reliable signal.
+    * **Greek-Excel re-save** — comma decimals (``14,32``), ``d/m/yyyy`` dates,
+      and times reformatted as time-of-day with ``πμ/μμ`` markers.
+
+    Returns True only for the Excel-re-saved shape.
+    """
+    date_hdr = next(
+        (h for h, (k, _) in header_info.items() if k == "start_local"), None
+    )
+    time_hdrs = [
+        h for h, (k, _) in header_info.items()
+        if k in ("duration_raw", "avg_pace_raw", "moving_time_raw", "elapsed_time_raw")
+    ]
+    for row in rows:
+        # Greek letters in a time/pace field ⇒ Excel reformatted it (πμ/μμ)
+        for h in time_hdrs:
+            v = row.get(h) or ""
+            if any(ch in v for ch in ("π", "μ", "Π", "Μ")):
+                return True
+        if date_hdr:
+            d = (row.get(date_hdr) or "").strip()
+            if re.match(r"^\d{4}-\d{2}-\d{2}", d):
+                return False   # ISO date ⇒ raw export
+            if re.match(r"^\d{1,2}/\d{1,2}/\d{4}", d):
+                return True    # d/m/yyyy ⇒ Excel re-save
+    return False               # default: assume raw/period format
 
 
 # --------------------------- Parsing helpers ------------------------------
@@ -314,12 +399,6 @@ def _synthetic_id(
     return -int(h, 16)
 
 
-def _is_running(activity_type: str | None) -> bool:
-    if not activity_type:
-        return False
-    return activity_type.strip().lower() in RUNNING_TYPES
-
-
 # --------------------------------- Core ------------------------------------
 
 
@@ -329,17 +408,20 @@ def parse_rows(
 ) -> list[dict[str, Any]]:
     """Convert raw CSV rows into our activity summary dicts.
 
-    Auto-detects English vs Greek locale from the header set.
-    Returns only running activities; non-runs are silently skipped.
+    Handles both Garmin export shapes (raw period-decimal/ISO and the
+    Greek-Excel comma-decimal re-save) by detecting the number/date format
+    from the actual data. Returns running and cycling activities, each tagged
+    with its ``activity_type``; other sports are silently skipped.
     """
-    greek = _is_greek_locale(headers)
-
     # Map raw header → (normalized field name, unit hint)
     header_info: dict[str, tuple[str, str | None]] = {}
     for h in headers:
         norm = _normalize_header(h)
         if norm in HEADER_ALIASES:
             header_info[h] = (HEADER_ALIASES[norm], _header_unit(h))
+
+    # Detect the number/date format from the data, not the header language.
+    excel_greek = _detect_excel_greek(rows, header_info)
 
     distance_header = next(
         (h for h, (k, _) in header_info.items() if k == "distance_raw"),
@@ -348,11 +430,11 @@ def parse_rows(
     distance_unit = (header_info[distance_header][1] if distance_header else None) or "km"
     distance_is_km = "km" in distance_unit
 
-    parse_duration = _parse_duration_greek if greek else _parse_duration_english
-    parse_pace = _parse_pace_greek if greek else _parse_pace_english
+    parse_duration = _parse_duration_greek if excel_greek else _parse_duration_english
+    parse_pace = _parse_pace_greek if excel_greek else _parse_pace_english
 
     results: list[dict[str, Any]] = []
-    skipped_non_running = 0
+    skipped_other = 0
     skipped_invalid = 0
 
     for row in rows:
@@ -362,28 +444,30 @@ def parse_rows(
             if info:
                 norm_row[info[0]] = (value or "").strip()
 
-        if not _is_running(norm_row.get("activity_type")):
-            skipped_non_running += 1
+        category = _activity_category(norm_row.get("activity_type"))
+        if category is None:
+            skipped_other += 1
             continue
 
         raw_date = norm_row.get("start_local") or ""
         if not raw_date:
             skipped_invalid += 1
             continue
-        start_local = _parse_greek_date(raw_date) if greek else raw_date
+        start_local = _parse_greek_date(raw_date) if excel_greek else raw_date
 
-        distance_raw = _parse_float(norm_row.get("distance_raw"), greek=greek)
+        distance_raw = _parse_float(norm_row.get("distance_raw"), greek=excel_greek)
         duration_min = (
             parse_duration(norm_row.get("duration_raw"))
             or parse_duration(norm_row.get("moving_time_raw"))
             or parse_duration(norm_row.get("elapsed_time_raw"))
         )
         pace = parse_pace(norm_row.get("avg_pace_raw"))
+        speed = _parse_float(norm_row.get("avg_speed_raw"), greek=excel_greek)
 
         # Distance unit resolution
         if distance_raw is None:
             distance_km: float | None = None
-        elif greek and "," not in (norm_row.get("distance_raw") or ""):
+        elif excel_greek and "," not in (norm_row.get("distance_raw") or ""):
             # Greek export with stripped decimals: cross-check pace × duration.
             # If raw / 100 matches expected_km better, use that (most common).
             if pace and duration_min:
@@ -407,28 +491,34 @@ def parse_rows(
         else:
             distance_km = round(distance_raw * 1.609344, 3)
 
-        # If pace was in min/mi, convert to min/km
-        if pace is not None and not distance_is_km and not greek:
-            pace = round(pace / 1.609344, 3)
+        # Convert imperial units to metric when the export is in miles/mph
+        if pace is not None and not distance_is_km and not excel_greek:
+            pace = round(pace / 1.609344, 3)        # min/mi → min/km
+        if speed is not None:
+            if not distance_is_km:
+                speed = round(speed * 1.609344, 2)  # mph → km/h
+            else:
+                speed = round(speed, 2)
 
         summary = {
             "id": _synthetic_id(start_local, distance_km, duration_min),
-            "name": norm_row.get("name") or "Imported run",
+            "name": norm_row.get("name") or f"Imported {category}",
             "start_local": start_local,
             "distance_km": distance_km,
             "duration_min": duration_min,
-            "avg_pace_min_per_km": pace,
-            "avg_hr": _parse_int(norm_row.get("avg_hr"), greek=greek),
-            "max_hr": _parse_int(norm_row.get("max_hr"), greek=greek),
+            "avg_pace_min_per_km": pace,    # running metric (None for cycling)
+            "avg_speed_kmh": speed,         # cycling metric (None for running)
+            "avg_hr": _parse_int(norm_row.get("avg_hr"), greek=excel_greek),
+            "max_hr": _parse_int(norm_row.get("max_hr"), greek=excel_greek),
             "vo2max": None,
-            "elevation_gain_m": _parse_float(norm_row.get("elevation_gain_m"), greek=greek),
-            "calories": _parse_int(norm_row.get("calories"), greek=greek),
-            "activity_type": "running",
+            "elevation_gain_m": _parse_float(norm_row.get("elevation_gain_m"), greek=excel_greek),
+            "calories": _parse_int(norm_row.get("calories"), greek=excel_greek),
+            "activity_type": category,
         }
         results.append(summary)
 
-    if skipped_non_running:
-        logger.info("Skipped %d non-running activities", skipped_non_running)
+    if skipped_other:
+        logger.info("Skipped %d non-running/cycling activities", skipped_other)
     if skipped_invalid:
         logger.info("Skipped %d rows missing required fields", skipped_invalid)
     return results
@@ -486,7 +576,7 @@ def _read_csv(path: Path) -> tuple[list[str], list[dict[str, str]], str]:
 
 
 def import_csv_file(path: str | Path) -> int:
-    """Parse a Garmin CSV file and upsert running activities into the DB.
+    """Parse a Garmin CSV file and upsert running/cycling activities into the DB.
 
     Returns the number of activities written. Re-importing the same CSV is
     idempotent.
@@ -506,7 +596,7 @@ def import_csv_file(path: str | Path) -> int:
             {"_source": "csv_import", "_file": path.name, "_encoding": encoding},
         )
 
-    logger.info("Imported %d running activities from %s", len(summaries), path)
+    logger.info("Imported %d activities from %s", len(summaries), path)
     return len(summaries)
 
 
@@ -530,7 +620,7 @@ def main(argv: list[str] | None = None) -> int:
         logger.exception("Import failed")
         print(f"ERROR: {type(e).__name__}: {e}", file=sys.stderr)
         return 1
-    print(f"\nImported {n} running activities from {csv_path}")
+    print(f"\nImported {n} activities from {csv_path}")
     print(f"Database now contains {total} total activities.")
     return 0
 

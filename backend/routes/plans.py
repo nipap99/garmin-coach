@@ -14,7 +14,7 @@ from datetime import date, timedelta
 from typing import Any
 
 from anthropic import Anthropic
-from fastapi import APIRouter
+from fastapi import APIRouter, Form
 from fastapi.responses import HTMLResponse
 
 from .. import config, db
@@ -143,6 +143,75 @@ Rules:
     return plan
 
 
+def _parse_plan_text(text: str) -> dict[str, Any]:
+    """Convert a free-text training plan (pasted from the AI chat) into the
+    structured plan JSON used by the calendar view. Calls Claude to do the
+    extraction so it tolerates any formatting the coach happened to use.
+    """
+    next_mon = _next_monday()
+    days_dates = [(next_mon + timedelta(i)).isoformat() for i in range(7)]
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday",
+                 "Friday", "Saturday", "Sunday"]
+
+    prompt = f"""You are given a running training plan written in free-form text
+(it was produced by a coaching assistant in a chat). Convert it into a
+structured 7-day week. If the text covers fewer than 7 days, fill the missing
+days as rest. If it covers more than a week, use only the first 7 days.
+
+Assume the week starts Monday {next_mon.isoformat()} unless the text says otherwise.
+
+--- PLAN TEXT START ---
+{text.strip()}
+--- PLAN TEXT END ---
+
+Return ONLY a raw JSON object — no markdown fences, no explanation:
+{{
+  "week_start": "{next_mon.isoformat()}",
+  "summary": "One sentence describing the week's focus (infer it from the plan)",
+  "weekly_km": 0.0,
+  "source": "chat",
+  "days": [
+    {{
+      "day": "Monday",
+      "date": "{days_dates[0]}",
+      "workout_type": "easy",
+      "title": "Short workout title",
+      "description": "The details from the plan text for this day",
+      "distance_km": 0.0,
+      "duration_min": 0,
+      "intensity": "easy"
+    }}
+  ]
+}}
+
+Rules:
+- Include all 7 days in order: {", ".join(f"{n} ({d})" for n, d in zip(day_names, days_dates))}
+- workout_type: one of easy, tempo, intervals, long, rest, cross
+- intensity: one of easy, moderate, hard, rest
+- For rest days: distance_km = 0, duration_min = 0
+- Keep the description faithful to what the plan text actually says — do not invent workouts
+- If distance or duration is not stated for a day, set it to 0
+- weekly_km = sum of all daily distances"""
+
+    client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
+    response = client.messages.create(
+        model="claude-opus-4-7",
+        max_tokens=2000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    raw = response.content[0].text.strip()
+    match = re.search(r"\{[\s\S]*\}", raw)
+    if not match:
+        raise ValueError("Could not read a plan out of that text.")
+    plan = json.loads(match.group())
+    if "days" not in plan or len(plan["days"]) < 7:
+        raise ValueError(
+            f"Only found {len(plan.get('days', []))} days in that text (need 7)."
+        )
+    plan["source"] = "chat"
+    return plan
+
+
 # ─── HTML rendering ──────────────────────────────────────────────────────────
 
 def _render_day_card(day: dict) -> str:
@@ -233,6 +302,82 @@ def _render_plans(plans: list[dict]) -> str:
     return "".join(_render_plan_card(p) for p in plans)
 
 
+def _render_calendar_cell(day: dict) -> str:
+    """One day column in the Mon–Sun calendar grid."""
+    wtype = day.get("workout_type", "easy")
+    badge_label, color = WORKOUT_BADGES.get(wtype, ("Run", "#4f8cff"))
+    dist = float(day.get("distance_km") or 0)
+    dur = int(day.get("duration_min") or 0)
+    is_rest = wtype == "rest" or (dist == 0 and dur == 0)
+
+    meta_parts = []
+    if dist > 0:
+        meta_parts.append(f"{dist:.1f} km")
+    if dur > 0:
+        meta_parts.append(f"{dur} min")
+    meta_html = (
+        f'<div class="cal-meta">{" · ".join(meta_parts)}</div>' if meta_parts else ""
+    )
+
+    body = (
+        '<div class="cal-rest">Rest</div>'
+        if is_rest else
+        f'<div class="cal-title">{day.get("title", "")}</div>'
+        f'<div class="cal-desc">{day.get("description", "")}</div>'
+        f'{meta_html}'
+    )
+
+    return (
+        f'<div class="cal-cell{" cal-cell-rest" if is_rest else ""}" '
+        f'style="border-top:3px solid {color}">'
+        f'<div class="cal-day">{day.get("day", "")[:3]}</div>'
+        f'<div class="cal-date">{(day.get("date") or "")[5:10]}</div>'
+        f'<span class="cal-badge" style="background:{color}22;color:{color};'
+        f'border:1px solid {color}44">{badge_label}</span>'
+        f'{body}'
+        f'</div>'
+    )
+
+
+def _render_calendar(plan: dict | None) -> str:
+    """Render the latest pasted plan as a 7-day calendar, or an empty prompt."""
+    if not plan:
+        return (
+            '<div class="empty">No plan saved yet. Paste a training plan from your '
+            'coach above and click <strong>Visualize &amp; Save</strong>.</div>'
+        )
+
+    pj = plan.get("plan_json") or {}
+    if isinstance(pj, str):
+        try:
+            pj = json.loads(pj)
+        except Exception:
+            pj = {}
+
+    plan_id = plan["id"]
+    days = pj.get("days", [])[:7]
+    cells = "".join(_render_calendar_cell(d) for d in days)
+    weekly_km = float(pj.get("weekly_km") or 0)
+
+    return (
+        '<div class="cal-wrap">'
+        '<div class="cal-head">'
+        f'<div>'
+        f'<div class="cal-week">Week of {pj.get("week_start", "")}</div>'
+        f'<div class="cal-summary">{pj.get("summary", "")}</div>'
+        f'</div>'
+        f'<div class="cal-head-right">'
+        f'<span class="cal-total">{weekly_km:.1f} km</span>'
+        f'<button class="btn btn-ghost btn-small" '
+        f'hx-delete="/plans/{plan_id}/calendar" hx-target="#plan-calendar" '
+        f'hx-confirm="Remove this saved plan?">Clear</button>'
+        f'</div>'
+        f'</div>'
+        f'<div class="cal-grid">{cells}</div>'
+        f'</div>'
+    )
+
+
 # ─── Routes ──────────────────────────────────────────────────────────────────
 
 @router.get("", response_class=HTMLResponse)
@@ -267,3 +412,47 @@ def accept_plan(plan_id: int) -> HTMLResponse:
 def archive_plan(plan_id: int) -> HTMLResponse:
     db.update_plan_status(plan_id, "archived")
     return HTMLResponse(_render_plans(db.list_weekly_plans()))
+
+
+# ─── Pasted-from-chat plan (Activities page calendar) ────────────────────────
+
+@router.get("/calendar", response_class=HTMLResponse)
+def plan_calendar() -> HTMLResponse:
+    """Return the latest chat-pasted plan rendered as a calendar grid."""
+    return HTMLResponse(_render_calendar(db.get_latest_weekly_plan(source="chat")))
+
+
+@router.post("/parse", response_class=HTMLResponse)
+def parse_plan(plan_text: str = Form(...)) -> HTMLResponse:
+    """Take free-text plan pasted from the AI chat, structure it, save it,
+    and return the calendar view.
+    """
+    text = (plan_text or "").strip()
+    if len(text) < 20:
+        return HTMLResponse(
+            '<div class="banner error">That doesn\'t look like a plan — paste the '
+            'full text your coach gave you.</div>'
+            + _render_calendar(db.get_latest_weekly_plan(source="chat"))
+        )
+    try:
+        plan_json = _parse_plan_text(text)
+        week_start = plan_json.get("week_start", _next_monday().isoformat())
+        # Archive any previous chat plan so the calendar always shows the newest
+        prev = db.get_latest_weekly_plan(source="chat")
+        if prev:
+            db.update_plan_status(prev["id"], "archived")
+        db.create_weekly_plan(week_start, plan_json)
+    except Exception as exc:
+        logger.exception("Plan parse failed")
+        return HTMLResponse(
+            f'<div class="banner error">Could not read that plan: {exc}</div>'
+            + _render_calendar(db.get_latest_weekly_plan(source="chat"))
+        )
+    return HTMLResponse(_render_calendar(db.get_latest_weekly_plan(source="chat")))
+
+
+@router.delete("/{plan_id}/calendar", response_class=HTMLResponse)
+def clear_calendar_plan(plan_id: int) -> HTMLResponse:
+    """Archive a chat-pasted plan and return the (now empty) calendar."""
+    db.update_plan_status(plan_id, "archived")
+    return HTMLResponse(_render_calendar(db.get_latest_weekly_plan(source="chat")))

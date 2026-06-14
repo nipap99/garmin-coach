@@ -1,12 +1,12 @@
 """Playwright-based Garmin Connect CSV exporter.
 
-Opens a visible Chromium window so the user can log in if needed,
-then automatically navigates to the running-activities page and
-clicks "Export to CSV". The downloaded file is saved to data/CSVs/
-with a timestamp name so it never collides with existing files.
+Opens a visible Chromium window so the user can log in if needed, then — in
+one session — navigates to each sport's filtered activities view (running,
+cycling) and clicks "Export to CSV". Each download is saved to data/CSVs/
+with a sport + timestamp name so files never collide.
 
-Browser cookies are persisted in data/garmin_session.json, so
-re-login is usually only needed once or after a session expires.
+Browser cookies/history are persisted in data/chrome_profile/, so re-login is
+usually only needed once or after a session expires.
 """
 from __future__ import annotations
 
@@ -21,7 +21,17 @@ from . import config
 
 logger = logging.getLogger(__name__)
 
-ACTIVITIES_URL = "https://connect.garmin.com/app/activities?activityType=running"
+_ACTIVITIES_BASE = "https://connect.garmin.com/app/activities"
+
+# Each sport is its own top-level filter tab on the Garmin activities page,
+# selected via the activityType URL param. Exporting from each filtered view
+# gives a sport-specific CSV with the right columns (running has pace,
+# cycling has speed).
+SPORT_URLS: dict[str, str] = {
+    "running": f"{_ACTIVITIES_BASE}?activityType=running",
+    "cycling": f"{_ACTIVITIES_BASE}?activityType=cycling",
+}
+
 DOWNLOAD_DIR: Path = config.PROJECT_ROOT / "data" / "CSVs"
 
 # Export button text in supported locales
@@ -41,58 +51,74 @@ _LOGIN_TIMEOUT_MS = 300_000   # 5 minutes
 PROFILE_DIR: Path = config.PROJECT_ROOT / "data" / "chrome_profile"
 
 
-def export_csv() -> Path:
-    """Open Garmin Connect, wait for login if needed, export running CSV.
+def export_activities(sports: list[str] | None = None) -> list[Path]:
+    """Open Garmin Connect once, wait for login if needed, and export a CSV for
+    each requested sport (default: running then cycling) in the same session.
 
     Uses a persistent Chrome profile stored in data/chrome_profile/ so the
     browser looks like a real returning user (cookies, history) and Garmin
     does not block it as a bot. After the first successful login the session
     is reused automatically.
 
-    Returns the local path of the saved CSV file.
+    Returns the list of saved CSV paths (one per sport that exported OK).
     """
+    sports = sports or ["running", "cycling"]
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
     PROFILE_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
-    dest = DOWNLOAD_DIR / f"garmin_sync_{timestamp}.csv"
 
+    saved: list[Path] = []
     with sync_playwright() as pw:
         # launch_persistent_context keeps cookies/history between runs and
         # avoids the "new unknown device" block Garmin applies to fresh profiles
         context = _launch_persistent(pw)
         page = context.new_page()
 
-        logger.info("Opening %s", ACTIVITIES_URL)
-        page.goto(ACTIVITIES_URL, wait_until="domcontentloaded")
-
+        first_url = SPORT_URLS[sports[0]]
+        logger.info("Opening %s", first_url)
+        page.goto(first_url, wait_until="domcontentloaded")
         _wait_for_login(page)
 
-        # After login Garmin often redirects to the home page — go back to activities
-        if "activities" not in page.url:
-            logger.info("Post-login redirect detected, navigating to activities page…")
-            page.goto(ACTIVITIES_URL, wait_until="domcontentloaded")
-
-        # Wait up to 45 s for the export button to appear (Garmin SPA is slow)
-        logger.info("Waiting for Export CSV button to appear…")
-        export_btn = _wait_for_export_button(page, timeout=45_000)
-
-        if export_btn is None:
-            context.close()
-            raise RuntimeError(
-                "Could not find the Export CSV button after 45 seconds. "
-                "Try clicking Sync again — the page may have been slow to load."
-            )
-
-        logger.info("Clicking export button…")
-        with page.expect_download(timeout=60_000) as dl_handle:
-            export_btn.click()
-
-        download = dl_handle.value
-        download.save_as(dest)
-        logger.info("CSV saved → %s", dest)
+        for sport in sports:
+            try:
+                saved.append(_export_one_sport(page, sport))
+            except Exception:  # noqa: BLE001 — keep going so one bad sport
+                logger.exception("Export failed for %s", sport)
 
         context.close()  # profile is persisted automatically by Playwright
 
+    if not saved:
+        raise RuntimeError(
+            "No CSVs were exported. Try Sync again — the page may have been "
+            "slow to load, or you may need to log in."
+        )
+    return saved
+
+
+def _export_one_sport(page, sport: str) -> Path:
+    """Navigate to one sport's filtered view and export its CSV."""
+    url = SPORT_URLS[sport]
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    dest = DOWNLOAD_DIR / f"garmin_sync_{sport}_{timestamp}.csv"
+
+    logger.info("Navigating to %s view…", sport)
+    page.goto(url, wait_until="domcontentloaded")
+
+    # Let the SPA reload the filtered activity list before exporting
+    try:
+        page.wait_for_load_state("networkidle", timeout=20_000)
+    except PWTimeoutError:
+        pass  # networkidle is unreliable on SPAs; carry on
+
+    logger.info("Waiting for Export CSV button (%s)…", sport)
+    export_btn = _wait_for_export_button(page, timeout=45_000)
+    if export_btn is None:
+        raise RuntimeError(f"Export CSV button not found for {sport}.")
+
+    logger.info("Exporting %s…", sport)
+    with page.expect_download(timeout=60_000) as dl_handle:
+        export_btn.click()
+    dl_handle.value.save_as(dest)
+    logger.info("%s CSV saved → %s", sport, dest)
     return dest
 
 

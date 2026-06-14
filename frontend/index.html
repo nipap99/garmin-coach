@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
   <style>
     /* ── Tokens ─────────────────────────────────────────────────────────── */
     :root {
@@ -143,8 +144,8 @@
     }
 
     /* ── Spinner ─────────────────────────────────────────────────────────── */
-    #plan-spinner { display: none; }
-    #plan-spinner.htmx-request {
+    #plan-spinner, #parse-spinner { display: none; }
+    #plan-spinner.htmx-request, #parse-spinner.htmx-request {
       display: inline-flex;
       align-items: center;
       gap: 0.6rem;
@@ -217,6 +218,34 @@
     .pr-time { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; margin: 0.2rem 0; }
     .pr-pace { font-size: 0.78rem; color: var(--muted); }
     .pr-date { font-size: 0.72rem; color: var(--muted); margin-top: 0.2rem; }
+
+    /* ── Fitness tracker ─────────────────────────────────────────────────── */
+    .fitness-section { margin-top: 2rem; }
+    .fitness-section h3 {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .fitness-chart-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.2rem 1.4rem 1rem;
+    }
+    .fitness-chart-card h4 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 0.2rem;
+    }
+    .fitness-chart-card p {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    #chart-aerobic { max-height: 260px; }
 
     /* ── Activities table ────────────────────────────────────────────────── */
     .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -323,12 +352,84 @@
     .day-desc  { color: var(--muted); font-size: 0.76rem; line-height: 1.4; }
     .day-meta  { color: var(--accent); font-size: 0.74rem; font-weight: 600; margin-top: 0.35rem; }
 
+    /* ── Paste-a-plan section (Activities) ───────────────────────────────── */
+    .plan-paste {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.2rem 1.4rem;
+      margin: 1.2rem 0;
+    }
+    .plan-paste h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .plan-paste p  { color: var(--muted); font-size: 0.8rem; margin-bottom: 0.9rem; line-height: 1.5; }
+    .plan-paste textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      padding: 0.7rem 0.85rem;
+      font-family: inherit;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      resize: vertical;
+    }
+    .plan-paste textarea:focus { outline: none; border-color: var(--accent); }
+    .plan-paste-actions {
+      display: flex; align-items: center; gap: 0.9rem; margin-top: 0.75rem;
+    }
+
+    /* ── Plan calendar (7-day grid) ──────────────────────────────────────── */
+    .cal-wrap {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.2rem 1.4rem;
+    }
+    .cal-head {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;
+    }
+    .cal-week { font-weight: 600; font-size: 0.95rem; }
+    .cal-summary { color: var(--muted); font-size: 0.82rem; margin-top: 0.15rem; max-width: 60ch; }
+    .cal-head-right { display: flex; align-items: center; gap: 0.8rem; }
+    .cal-total {
+      font-weight: 700; font-size: 1rem; color: var(--accent);
+      white-space: nowrap;
+    }
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 0.5rem;
+    }
+    .cal-cell {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.7rem 0.6rem;
+      min-width: 0;
+      display: flex; flex-direction: column;
+    }
+    .cal-cell-rest { opacity: 0.6; }
+    .cal-day  { font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+    .cal-date { font-size: 0.68rem; color: var(--muted); margin-bottom: 0.5rem; }
+    .cal-badge {
+      display: inline-block; align-self: flex-start;
+      padding: 0.16rem 0.42rem; border-radius: 4px;
+      font-size: 0.64rem; font-weight: 600; margin-bottom: 0.45rem;
+    }
+    .cal-title { font-weight: 600; font-size: 0.78rem; margin-bottom: 0.25rem; line-height: 1.3; }
+    .cal-desc  { color: var(--muted); font-size: 0.72rem; line-height: 1.4; }
+    .cal-meta  { color: var(--accent); font-size: 0.72rem; font-weight: 600; margin-top: 0.4rem; }
+    .cal-rest  { color: var(--muted); font-size: 0.8rem; font-style: italic; }
+
     /* ── Mobile nav ──────────────────────────────────────────────────────── */
     .mobile-nav { display: none; }
 
     /* ── Responsive ──────────────────────────────────────────────────────── */
     @media (max-width: 1050px) {
       .days-grid { grid-template-columns: repeat(4, 1fr); }
+      .cal-grid  { grid-template-columns: repeat(4, 1fr); }
     }
     @media (max-width: 767px) {
       /* Show mobile nav, hide desktop tabs */
@@ -371,6 +472,7 @@
       .charts-grid { grid-template-columns: 1fr; }
       /* Days grid: 2 columns */
       .days-grid { grid-template-columns: repeat(2, 1fr); }
+      .cal-grid  { grid-template-columns: repeat(2, 1fr); }
       /* Goal form stacks */
       .goal-form { flex-direction: column; align-items: stretch; }
       /* Chat form stacks */
@@ -382,6 +484,7 @@
     @media (max-width: 480px) {
       .stat-value { font-size: 1.4rem; }
       .days-grid { grid-template-columns: 1fr; }
+      .cal-grid  { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -392,7 +495,7 @@
   <div class="logo">&#127939; Garmin <span>Coach</span></div>
   <nav class="desktop-tabs">
     <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
-    <button class="tab-btn" data-tab="activities">Activities</button>
+    <button class="tab-btn" data-tab="cycling">Cycling</button>
     <button class="tab-btn" data-tab="plan">Training Plan</button>
     <button class="tab-btn" data-tab="goals">Goals</button>
     <button class="tab-btn" data-tab="coach">Coach</button>
@@ -404,6 +507,32 @@
 
   <!-- ── Dashboard ──────────────────────────────────────────────────────── -->
   <div id="panel-dashboard" class="tab-panel">
+    <div class="toolbar">
+      <button class="btn"
+              hx-post="/sync"
+              hx-target="#sync-status"
+              hx-indicator="this"
+              title="Opens a browser window — log in to Garmin Connect if prompted, then the export runs automatically">
+        Sync from Garmin
+      </button>
+      <form hx-post="/import/csv"
+            hx-target="#sync-status"
+            hx-encoding="multipart/form-data"
+            style="display:inline-flex;gap:0.5rem;align-items:center">
+        <label for="csv-file"
+               style="cursor:pointer;padding:0.45rem 0.8rem;background:var(--panel);
+                      border:1px solid var(--border);border-radius:var(--radius);font-size:0.85rem">
+          Choose CSV…
+        </label>
+        <input id="csv-file" type="file" name="file" accept=".csv" required style="display:none"
+               onchange="this.form.querySelector('button').disabled=!this.files.length;
+                         document.getElementById('csv-filename').textContent=this.files[0]?this.files[0].name:''">
+        <span id="csv-filename" style="color:var(--muted);font-size:0.82rem"></span>
+        <button class="btn" type="submit" disabled>Import</button>
+      </form>
+    </div>
+    <div id="sync-status"></div>
+
     <div class="stat-cards">
       <div class="stat-card">
         <div class="stat-value" id="stat-runs">—</div>
@@ -443,57 +572,80 @@
     </div>
   </div>
 
-  <!-- ── Activities ─────────────────────────────────────────────────────── -->
-  <div id="panel-activities" class="tab-panel" hidden>
-    <div class="toolbar">
-      <button class="btn"
-              hx-post="/sync"
-              hx-target="#activities-panel"
-              hx-indicator="this"
-              title="Opens a browser window — log in to Garmin Connect if prompted, then the export runs automatically">
-        Sync from Garmin
-      </button>
-      <label for="days">Last</label>
-      <select name="days" id="days"
-              hx-get="/activities"
-              hx-target="#activities-panel"
-              hx-trigger="change">
-        <option value="7">7 days</option>
-        <option value="30" selected>30 days</option>
-        <option value="90">90 days</option>
-        <option value="365">1 year</option>
-      </select>
-      <form hx-post="/import/csv"
-            hx-target="#activities-panel"
-            hx-encoding="multipart/form-data"
-            style="display:inline-flex;gap:0.5rem;align-items:center">
-        <label for="csv-file"
-               style="cursor:pointer;padding:0.45rem 0.8rem;background:var(--panel);
-                      border:1px solid var(--border);border-radius:var(--radius);font-size:0.85rem">
-          Choose CSV…
-        </label>
-        <input id="csv-file" type="file" name="file" accept=".csv" required style="display:none"
-               onchange="this.form.querySelector('button').disabled=!this.files.length;
-                         document.getElementById('csv-filename').textContent=this.files[0]?this.files[0].name:''">
-        <span id="csv-filename" style="color:var(--muted);font-size:0.82rem"></span>
-        <button class="btn" type="submit" disabled>Import</button>
-      </form>
+  <!-- ── Cycling ────────────────────────────────────────────────────────── -->
+  <div id="panel-cycling" class="tab-panel" hidden>
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-value" id="cyc-rides">—</div>
+        <div class="stat-label">Total Rides</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="cyc-km">—</div>
+        <div class="stat-label">Total Distance</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="cyc-month">—</div>
+        <div class="stat-label">This Month</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="cyc-week">—</div>
+        <div class="stat-label">This Week</div>
+      </div>
     </div>
-    <div id="activities-panel"
-         hx-get="/activities?days=30"
-         hx-trigger="load">
-      <div class="table-scroll panel"><div class="empty">Loading…</div></div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Weekly Distance</h3>
+        <canvas id="chart-cyc-distance"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Speed Trend <span style="font-weight:400;text-transform:none;letter-spacing:0">(higher = faster)</span></h3>
+        <canvas id="chart-cyc-speed"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Heart Rate Trend <span style="font-weight:400;text-transform:none;letter-spacing:0">(lower = fitter)</span></h3>
+        <canvas id="chart-cyc-hr"></canvas>
+      </div>
     </div>
   </div>
 
   <!-- ── Training Plan ──────────────────────────────────────────────────── -->
   <div id="panel-plan" class="tab-panel" hidden>
-    <div class="toolbar" style="margin-bottom:1.25rem">
-      <button class="btn"
+
+    <!-- Paste a plan from the coach → calendar -->
+    <div class="plan-paste">
+      <h3>Paste a plan from your coach</h3>
+      <p>Copy the training plan the AI coach gave you in the chat, paste it below,
+         and it will be turned into a clean weekly calendar — and saved here.</p>
+      <form hx-post="/plans/parse"
+            hx-target="#plan-calendar"
+            hx-indicator="#parse-spinner"
+            hx-on::after-request="if(event.detail.successful) this.reset()">
+        <textarea name="plan_text" rows="6"
+                  placeholder="e.g.&#10;Monday: Easy 6 km at 6:00/km, HR under 145&#10;Tuesday: Rest&#10;Wednesday: 5×800m intervals…"></textarea>
+        <div class="plan-paste-actions">
+          <button class="btn" type="submit">&#10024; Visualize &amp; Save</button>
+          <span id="parse-spinner">
+            <span class="spinner-ring"></span>
+            Reading your plan… ~15 seconds
+          </span>
+        </div>
+      </form>
+    </div>
+
+    <div id="plan-calendar"
+         hx-get="/plans/calendar"
+         hx-trigger="load">
+      <div class="empty">Loading…</div>
+    </div>
+
+    <!-- Or auto-generate a plan from your data -->
+    <div class="toolbar" style="margin-top:2rem">
+      <button class="btn btn-outline"
               hx-post="/plans/generate"
               hx-target="#plans-panel"
               hx-indicator="#plan-spinner">
-        &#10024; Generate My Week
+        &#10024; Or auto-generate from my data
       </button>
       <div id="plan-spinner">
         <span class="spinner-ring"></span>
@@ -542,6 +694,19 @@
          hx-trigger="load">
       <div class="empty">Loading…</div>
     </div>
+
+    <!-- Fitness Tracker -->
+    <div class="fitness-section">
+      <h3>Fitness Tracker</h3>
+      <div class="fitness-chart-card">
+        <h4>Aerobic Efficiency Trend</h4>
+        <p>
+          Speed ÷ Heart Rate × 100 — higher is fitter. Each dot is one run;
+          the line is the weekly average. Runs under 3 km excluded.
+        </p>
+        <canvas id="chart-aerobic"></canvas>
+      </div>
+    </div>
   </div>
 
   <!-- ── Coach ──────────────────────────────────────────────────────────── -->
@@ -580,9 +745,9 @@
     <span class="mobile-icon">&#128202;</span>
     <span>Dashboard</span>
   </button>
-  <button class="mobile-tab" data-tab="activities">
-    <span class="mobile-icon">&#127939;</span>
-    <span>Activities</span>
+  <button class="mobile-tab" data-tab="cycling">
+    <span class="mobile-icon">&#128692;</span>
+    <span>Cycling</span>
   </button>
   <button class="mobile-tab" data-tab="plan">
     <span class="mobile-icon">&#128197;</span>
@@ -606,6 +771,8 @@ function showTab(name) {
   document.getElementById('panel-' + name).hidden = false;
   document.querySelectorAll('[data-tab="' + name + '"]').forEach(el => el.classList.add('active'));
   if (name === 'dashboard') initDashboard();
+  if (name === 'goals')     initGoals();
+  if (name === 'cycling')   initCycling();
 }
 
 document.querySelectorAll('[data-tab]').forEach(btn => {
@@ -648,8 +815,9 @@ const CHART_BASE = {
   },
 };
 
-// ── Dashboard init (runs once) ─────────────────────────────────────────────
+// ── Dashboard init (refreshable) ───────────────────────────────────────────
 let dashReady = false;
+const _charts = {};   // stores Chart instances so they can be destroyed on refresh
 
 async function initDashboard() {
   if (dashReady) return;
@@ -670,9 +838,12 @@ async function initDashboard() {
     document.getElementById('stat-month').textContent = (summary.month_km   || 0) + ' km';
     document.getElementById('stat-week').textContent  = (summary.week_km    || 0) + ' km';
 
+    // Destroy any existing charts before re-creating (needed for refresh)
+    Object.keys(_charts).forEach(k => { if (_charts[k]) { _charts[k].destroy(); delete _charts[k]; } });
+
     // Weekly mileage bar chart
     if (mileage.labels && mileage.labels.length) {
-      new Chart(document.getElementById('chart-mileage'), {
+      _charts.mileage = new Chart(document.getElementById('chart-mileage'), {
         type: 'bar',
         data: {
           labels: mileage.labels.map(fmtWeek),
@@ -706,7 +877,7 @@ async function initDashboard() {
 
     // Pace trend line chart (Y axis inverted: lower pace = faster = visually higher)
     if (pace.labels && pace.labels.length) {
-      new Chart(document.getElementById('chart-pace'), {
+      _charts.pace = new Chart(document.getElementById('chart-pace'), {
         type: 'line',
         data: {
           labels: pace.labels,
@@ -746,7 +917,7 @@ async function initDashboard() {
 
     // Heart rate trend
     if (hr.labels && hr.labels.length) {
-      new Chart(document.getElementById('chart-hr'), {
+      _charts.hr = new Chart(document.getElementById('chart-hr'), {
         type: 'line',
         data: {
           labels: hr.labels,
@@ -810,6 +981,244 @@ async function initDashboard() {
     console.error('Dashboard init error:', err);
   }
 }
+
+// ── Aerobic Efficiency chart (Goals tab) ───────────────────────────────────
+let goalsReady = false;
+
+async function initGoals() {
+  if (goalsReady) return;
+  goalsReady = true;
+
+  try {
+    const data = await fetch('/stats/aerobic-efficiency').then(r => r.json());
+    if (!data.runs || !data.runs.length) return;
+
+    new Chart(document.getElementById('chart-aerobic'), {
+      data: {
+        datasets: [
+          {
+            // Background dots — individual runs
+            type: 'scatter',
+            label: 'Run',
+            data: data.runs.map(r => ({ x: r.date, y: r.efficiency })),
+            backgroundColor: 'rgba(79,140,255,0.18)',
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            order: 2,
+          },
+          {
+            // Trend line — weekly average
+            type: 'line',
+            label: 'Weekly avg',
+            data: data.trend.map(r => ({ x: r.date, y: r.efficiency })),
+            borderColor: '#4f8cff',
+            backgroundColor: 'rgba(79,140,255,0.08)',
+            borderWidth: 2.5,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            tension: 0.35,
+            fill: true,
+            order: 1,
+          },
+        ],
+      },
+      options: {
+        ...CHART_BASE,
+        plugins: {
+          ...CHART_BASE.plugins,
+          legend: { display: false },
+          tooltip: {
+            ...CHART_BASE.plugins.tooltip,
+            callbacks: {
+              title: items => items[0].raw.x,
+              label: ctx => {
+                const label = ctx.dataset.label === 'Run' ? 'Efficiency' : 'Weekly avg';
+                return `${label}: ${ctx.raw.y.toFixed(2)}`;
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            type: 'time',
+            time: { unit: 'month', tooltipFormat: 'MMM d, yyyy' },
+            ticks: { color: '#98a2b3', font: { size: 10 }, maxTicksLimit: 10 },
+            grid:  { color: 'rgba(255,255,255,0.04)' },
+          },
+          y: {
+            beginAtZero: false,
+            ticks: {
+              color: '#98a2b3',
+              font: { size: 10 },
+              callback: v => v.toFixed(1),
+            },
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            title: {
+              display: true,
+              text: 'Efficiency (higher = fitter)',
+              color: '#98a2b3',
+              font: { size: 10 },
+            },
+          },
+        },
+      },
+    });
+  } catch (e) {
+    console.error('Aerobic efficiency chart failed:', e);
+  }
+}
+
+// ── Cycling tab (lazy, refreshable) ────────────────────────────────────────
+let cycReady = false;
+const _cycCharts = {};
+const CYC = '#9b59b6';   // purple accent so cycling reads differently from running
+
+async function initCycling() {
+  if (cycReady) return;
+  cycReady = true;
+
+  try {
+    const [summary, dist, speed, hr] = await Promise.all([
+      fetch('/stats/cycling/summary').then(r => r.json()),
+      fetch('/stats/cycling/weekly-distance').then(r => r.json()),
+      fetch('/stats/cycling/speed-trend').then(r => r.json()),
+      fetch('/stats/cycling/hr-trend').then(r => r.json()),
+    ]);
+
+    document.getElementById('cyc-rides').textContent = (summary.total_rides || 0).toLocaleString();
+    document.getElementById('cyc-km').textContent    = (summary.total_km   || 0) + ' km';
+    document.getElementById('cyc-month').textContent = (summary.month_km   || 0) + ' km';
+    document.getElementById('cyc-week').textContent  = (summary.week_km    || 0) + ' km';
+
+    Object.keys(_cycCharts).forEach(k => { if (_cycCharts[k]) { _cycCharts[k].destroy(); delete _cycCharts[k]; } });
+
+    // Weekly distance bar
+    if (dist.labels && dist.labels.length) {
+      _cycCharts.dist = new Chart(document.getElementById('chart-cyc-distance'), {
+        type: 'bar',
+        data: {
+          labels: dist.labels.map(fmtWeek),
+          datasets: [{
+            data: dist.values,
+            backgroundColor: 'rgba(155,89,182,0.45)',
+            borderColor: CYC,
+            borderWidth: 1,
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          ...CHART_BASE,
+          plugins: {
+            ...CHART_BASE.plugins,
+            tooltip: {
+              ...CHART_BASE.plugins.tooltip,
+              callbacks: { label: ctx => ctx.raw + ' km (' + dist.counts[ctx.dataIndex] + ' rides)' },
+            },
+          },
+          scales: {
+            ...CHART_BASE.scales,
+            y: { ...CHART_BASE.scales.y, beginAtZero: true,
+                 ticks: { ...CHART_BASE.scales.y.ticks, callback: v => v + ' km' } },
+          },
+        },
+      });
+    }
+
+    // Speed trend line (higher = faster — normal Y axis)
+    if (speed.labels && speed.labels.length) {
+      _cycCharts.speed = new Chart(document.getElementById('chart-cyc-speed'), {
+        type: 'line',
+        data: {
+          labels: speed.labels,
+          datasets: [{
+            data: speed.values,
+            borderColor: CYC,
+            backgroundColor: 'rgba(155,89,182,0.08)',
+            tension: 0.35,
+            fill: true,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            pointBackgroundColor: CYC,
+          }],
+        },
+        options: {
+          ...CHART_BASE,
+          plugins: {
+            ...CHART_BASE.plugins,
+            tooltip: {
+              ...CHART_BASE.plugins.tooltip,
+              callbacks: {
+                label: ctx => ctx.raw + ' km/h  |  ' + speed.distances[ctx.dataIndex] + ' km ride',
+              },
+            },
+          },
+          scales: {
+            ...CHART_BASE.scales,
+            y: { ...CHART_BASE.scales.y, beginAtZero: false,
+                 ticks: { ...CHART_BASE.scales.y.ticks, callback: v => v + ' km/h' } },
+          },
+        },
+      });
+    }
+
+    // Heart rate trend line
+    if (hr.labels && hr.labels.length) {
+      _cycCharts.hr = new Chart(document.getElementById('chart-cyc-hr'), {
+        type: 'line',
+        data: {
+          labels: hr.labels,
+          datasets: [{
+            data: hr.values,
+            borderColor: '#e05252',
+            backgroundColor: 'rgba(224,82,82,0.07)',
+            tension: 0.35,
+            fill: true,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            pointBackgroundColor: '#e05252',
+          }],
+        },
+        options: {
+          ...CHART_BASE,
+          plugins: {
+            ...CHART_BASE.plugins,
+            tooltip: {
+              ...CHART_BASE.plugins.tooltip,
+              callbacks: {
+                label: ctx => {
+                  const spd = hr.speeds[ctx.dataIndex];
+                  const spdStr = spd ? '  |  ' + spd + ' km/h' : '';
+                  return ctx.raw + ' bpm  |  ' + hr.distances[ctx.dataIndex] + ' km' + spdStr;
+                },
+              },
+            },
+          },
+          scales: {
+            ...CHART_BASE.scales,
+            y: { ...CHART_BASE.scales.y, beginAtZero: false,
+                 ticks: { ...CHART_BASE.scales.y.ticks, callback: v => v + ' bpm' } },
+          },
+        },
+      });
+    }
+  } catch (err) {
+    console.error('Cycling init error:', err);
+  }
+}
+
+// ── Auto-refresh dashboard + cycling after sync / CSV import ────────────────
+document.body.addEventListener('htmx:afterRequest', evt => {
+  const url  = evt.detail.requestConfig?.path || '';
+  const ok   = evt.detail.successful;
+  if (!ok) return;
+  if (url === '/sync' || url.startsWith('/import')) {
+    // Reset so each tab re-fetches fresh data
+    dashReady = false;
+    cycReady = false;
+    if (!document.getElementById('panel-dashboard').hidden) initDashboard();
+    if (!document.getElementById('panel-cycling').hidden)   initCycling();
+  }
+});
 
 // Start on dashboard
 document.addEventListener('DOMContentLoaded', () => showTab('dashboard'));

@@ -6,6 +6,9 @@ data to Chart.js.
 """
 from __future__ import annotations
 
+from collections import defaultdict
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Query
 
 from .. import db
@@ -89,3 +92,86 @@ def personal_records():
             "pace_formatted":     _fmt_pace(float(pace)) if pace else "—",
         }
     return result
+
+
+@router.get("/cycling/summary")
+def cycling_summary():
+    """Totals for the four cycling stat cards."""
+    return db.get_cycling_summary()
+
+
+@router.get("/cycling/weekly-distance")
+def cycling_weekly_distance(weeks: int = Query(16, ge=4, le=52)):
+    """Weekly km totals for cycling (bar chart)."""
+    rows = db.get_cycling_weekly_distance(weeks=weeks)
+    return {
+        "labels": [r["week_start"] for r in rows],
+        "values": [float(r["total_km"]) for r in rows],
+        "counts": [int(r["ride_count"]) for r in rows],
+    }
+
+
+@router.get("/cycling/speed-trend")
+def cycling_speed_trend(limit: int = Query(30, ge=5, le=100)):
+    """Recent ride average speeds for the trend line (higher = faster)."""
+    rows = db.get_cycling_speed_trend(limit=limit)
+    return {
+        "labels":    [r["start_local"][:10] for r in rows],
+        "values":    [round(float(r["avg_speed_kmh"]), 1) for r in rows],
+        "distances": [round(float(r["distance_km"]), 1) for r in rows],
+    }
+
+
+@router.get("/cycling/hr-trend")
+def cycling_hr_trend(limit: int = Query(30, ge=5, le=100)):
+    """Average heart rate per ride for the trend chart."""
+    rows = db.get_cycling_hr_trend(limit=limit)
+    return {
+        "labels":    [r["start_local"][:10] for r in rows],
+        "values":    [int(r["avg_hr"]) for r in rows],
+        "distances": [round(float(r["distance_km"]), 1) for r in rows],
+        "speeds":    [round(float(r["avg_speed_kmh"]), 1)
+                      if r.get("avg_speed_kmh") else None
+                      for r in rows],
+    }
+
+
+@router.get("/aerobic-efficiency")
+def aerobic_efficiency():
+    """Aerobic efficiency score for each run + weekly averages for the trend line.
+
+    Formula per run:  efficiency = (speed_km_h / avg_hr) * 100
+                                 = (60 / avg_pace_min_per_km) / avg_hr * 100
+
+    A higher score means the runner is moving faster for the same cardiac effort.
+    Returns:
+      runs  – individual data points (date, efficiency) for the scatter dots
+      trend – weekly averages (date = week start Monday, efficiency) for the line
+    """
+    rows = db.get_aerobic_efficiency_runs()
+    if not rows:
+        return {"runs": [], "trend": []}
+
+    # ── individual run scores ─────────────────────────────────────────────────
+    runs: list[dict] = []
+    for r in rows:
+        pace = float(r["avg_pace_min_per_km"])
+        hr   = float(r["avg_hr"])
+        if pace <= 0 or hr <= 0:
+            continue
+        eff = round((60.0 / pace) / hr * 100, 3)
+        runs.append({"date": r["start_local"][:10], "efficiency": eff})
+
+    # ── weekly averages (trend line) ──────────────────────────────────────────
+    weeks: dict[str, list[float]] = defaultdict(list)
+    for run in runs:
+        d = datetime.fromisoformat(run["date"])
+        monday = (d - timedelta(days=d.weekday())).strftime("%Y-%m-%d")
+        weeks[monday].append(run["efficiency"])
+
+    trend = [
+        {"date": week, "efficiency": round(sum(effs) / len(effs), 3)}
+        for week, effs in sorted(weeks.items())
+    ]
+
+    return {"runs": runs, "trend": trend}
