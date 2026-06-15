@@ -1330,8 +1330,36 @@ Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">7 col
       weekly file so the long-term trend stays current (the nightly file lacks sleep-need and
       bed/wake times, so the weekly export is the only way to keep those charts alive). Both
       cadences share one guard each, so nothing ever runs more than it should. Everything is logged
-      to <code>data/sleep_sync.log</code>, and it's installed or removed with the two PowerShell
-      scripts.
+      to <code>data/sleep_sync.log</code>.
+    </div>
+  </div>
+
+  <h3>Turning it on &amp; off</h3>
+  <p>The automation is just one entry in the Windows logon list, so it's easy to add or remove —
+     no admin, no leftovers. Removing it never touches your collected data, and the in-app
+     <strong>Sync Sleep</strong> button keeps working either way.</p>
+  <table>
+    <tr><th>Action</th><th>How</th></tr>
+    <tr>
+      <td><strong>Install</strong></td>
+      <td><code>powershell -ExecutionPolicy Bypass -File scripts\install_sleep_task.ps1</code></td>
+    </tr>
+    <tr>
+      <td><strong>Remove</strong> (command)</td>
+      <td><code>powershell -ExecutionPolicy Bypass -File scripts\uninstall_sleep_task.ps1</code></td>
+    </tr>
+    <tr>
+      <td><strong>Remove</strong> (no commands)</td>
+      <td>Task Manager → <em>Startup apps</em> → <code>GarminCoachSleepSync</code> → <em>Disable</em></td>
+    </tr>
+  </table>
+  <div class="callout blue">
+    <span class="callout-icon">🧹</span>
+    <div>
+      Removal only deletes the logon entry. Your sleep history stays in the database, and you can
+      still sync by hand anytime. To wipe every last trace, optionally delete the two bookkeeping
+      files <code>data/sleep_sync_state.json</code> and <code>data/sleep_sync.log</code> — both
+      harmless to leave.
     </div>
   </div>
 </div>
