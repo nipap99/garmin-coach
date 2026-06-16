@@ -334,8 +334,8 @@
   <h1>Garmin <span>Coach</span><br>App</h1>
   <p class="cover-sub">
     A local AI-powered endurance coach that ingests Garmin <strong>running,
-    cycling and sleep</strong> data, visualises it, generates personalised weekly
-    plans with the Claude API, and keeps sleep current with a hands-off daily sync.
+    cycling and sleep</strong> data, visualises it, and generates personalised
+    weekly plans with the Claude API.
   </p>
   <div class="cover-meta">
     <div class="cover-meta-item">
@@ -348,7 +348,7 @@
     </div>
     <div class="cover-meta-item">
       <span class="cover-meta-label">Version</span>
-      <span class="cover-meta-value">3.0 · sleep + automation</span>
+      <span class="cover-meta-value">3.0 · sleep tracking</span>
     </div>
   </div>
   <div class="cover-badge-row">
@@ -379,7 +379,7 @@
     <li><span class="toc-num">9</span><span class="toc-title">Data flow — end to end</span><span class="toc-dots"></span></li>
     <li><span class="toc-num">10</span><span class="toc-title">File reference</span><span class="toc-dots"></span></li>
     <li><span class="toc-num">11</span><span class="toc-title">Technology choices</span><span class="toc-dots"></span></li>
-    <li><span class="toc-num">12</span><span class="toc-title">Sleep tracking &amp; daily automation</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">12</span><span class="toc-title">Sleep tracking</span><span class="toc-dots"></span></li>
   </ul>
 </div>
 
@@ -412,8 +412,7 @@
     <li><strong>AI weekly plans</strong> — generates a structured 7-day plan, or turns a plan you paste from the coach chat into a saved Mon–Sun calendar</li>
     <li><strong>AI coaching chat</strong> — streaming conversation with real-time context from your activities</li>
     <li><strong>Goals &amp; fitness tracking</strong> — race targets plus an aerobic-efficiency trend (speed ÷ heart rate over time)</li>
-    <li><strong>Sleep tab</strong> — per-night detail (deep/light/REM stages, HRV, recovery metrics) over a weekly long-term backdrop</li>
-    <li><strong>Hands-off daily sleep sync</strong> — runs automatically at logon and grabs last night's sleep, once per day, with no clicking (see §12)</li>
+    <li><strong>Sleep tab</strong> — per-night detail (deep/light/REM stages, HRV, recovery metrics) over a weekly long-term backdrop, synced on demand</li>
   </ul>
 
   <div class="callout blue">
@@ -457,7 +456,7 @@
         </div>
         <div class="arch-box" style="background:#0f1117">
           <span class="blue">😴 Sleep</span><br>
-          <span class="muted" style="font-size:0.72rem">nightly stages·HRV<br>auto daily sync</span>
+          <span class="muted" style="font-size:0.72rem">nightly stages·HRV<br>weekly backdrop</span>
         </div>
         <div class="arch-box" style="background:#0f1117">
           <span class="blue">📅 Plan</span><br>
@@ -1142,11 +1141,7 @@ Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">7 col
 ├── <span class="dir">frontend/</span><br>
 │ &nbsp;&nbsp;└── <span class="file">index.html</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># entire UI — all CSS, HTML, JS in one file</span><br>
 ├── <span class="dir">scripts/</span><br>
-│ &nbsp;&nbsp;├── <span class="file">bulk_import_csvs.py</span> &nbsp;&nbsp; <span class="note"># imports many CSV/xlsx files at once</span><br>
-│ &nbsp;&nbsp;├── <span class="file">daily_sleep_sync.py</span> &nbsp;&nbsp; <span class="note"># automated once-a-day sleep sync (guarded)</span><br>
-│ &nbsp;&nbsp;├── <span class="file">run_sleep_sync.bat</span> &nbsp;&nbsp;&nbsp; <span class="note"># launcher the logon entry calls</span><br>
-│ &nbsp;&nbsp;├── <span class="file">install_sleep_task.ps1</span> <span class="note"># register the daily sync at logon (no admin)</span><br>
-│ &nbsp;&nbsp;└── <span class="file">uninstall_sleep_task.ps1</span> <span class="note"># remove it</span><br>
+│ &nbsp;&nbsp;└── <span class="file">bulk_import_csvs.py</span> &nbsp;&nbsp; <span class="note"># imports many CSV/xlsx files at once</span><br>
 ├── <span class="dir">data/</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># ← gitignored: never committed</span><br>
 │ &nbsp;&nbsp;├── <span class="dir">CSVs/</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># raw Garmin CSV exports</span><br>
 │ &nbsp;&nbsp;└── <span class="dir">chrome_profile/</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># Playwright persistent browser session + cookies</span><br>
@@ -1225,14 +1220,13 @@ Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">7 col
 <div class="section">
   <div class="section-header">
     <div class="section-num teal">12</div>
-    <h2>Sleep Tracking &amp; Daily Automation</h2>
+    <h2>Sleep Tracking</h2>
   </div>
 
   <p>
     Sleep is <strong>not</strong> an activity, so it lives in its own tables and has its own
-    importer and scraper. The interesting parts are (a) Garmin offers three different sleep
-    exports with three different shapes, and (b) the sleep sync runs <strong>by itself</strong>
-    once a day.
+    importer and scraper. The interesting part: Garmin offers three different sleep exports with
+    three different shapes, and we use two of them.
   </p>
 
   <h3>Three export shapes — picking the right two</h3>
@@ -1292,76 +1286,13 @@ Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">7 col
     long-term backdrop (so the page isn't empty while nightly data accrues from today).
   </p>
 
-  <h3>The hands-off daily sync</h3>
+  <h3>Keeping it current</h3>
   <p>
-    The goal: capture last night's sleep <em>once a day, automatically, without clicking</em>.
-    Three pieces make that happen:
+    Sleep is synced on demand with the <strong>Sync Sleep</strong> button on the tab: it opens the
+    browser, exports the most recent night (1-day view), and imports it — the same scraper + parser
+    described above. The weekly backdrop is a periodic snapshot; re-running the 1-year export
+    refreshes it.
   </p>
-  <div class="flow">
-    <div class="flow-step">
-      <div class="flow-left"><div class="flow-dot">1</div><div class="flow-line"></div></div>
-      <div class="flow-content">
-        <strong>A guarded sync script</strong> — <code>scripts/daily_sleep_sync.py</code>
-        <span>Checks a small state file: if it already synced today, it exits immediately (no browser). Otherwise it exports last night, imports it, and records the date. A <em>failed</em> run isn't recorded, so it simply retries next time.</span>
-      </div>
-    </div>
-    <div class="flow-step">
-      <div class="flow-left"><div class="flow-dot teal">2</div><div class="flow-line"></div></div>
-      <div class="flow-content">
-        <strong>A launcher</strong> — <code>scripts/run_sleep_sync.bat</code>
-        <span>A one-line batch file that activates the project's Python and runs the script.</span>
-      </div>
-    </div>
-    <div class="flow-step">
-      <div class="flow-left"><div class="flow-dot green">3</div></div>
-      <div class="flow-content">
-        <strong>A logon trigger</strong> — the Windows <code>HKCU\…\Run</code> registry key
-        <span>Windows runs the launcher every time you log on. Task Scheduler would be tidier, but it's locked to admins on this machine, so the per-user Run key is the no-admin path. The once-a-day guard means only the first logon of the day actually opens a browser.</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="callout green">
-    <span class="callout-icon">✅</span>
-    <div>
-      <strong>Net effect:</strong> the first time you log on each day, a browser quietly opens for
-      ~10 seconds, pulls last night's sleep (stages, HRV and all), saves it, and closes — with no
-      action from you. <strong>Every 14 days</strong>, the same session also re-exports the 1-year
-      weekly file so the long-term trend stays current (the nightly file lacks sleep-need and
-      bed/wake times, so the weekly export is the only way to keep those charts alive). Both
-      cadences share one guard each, so nothing ever runs more than it should. Everything is logged
-      to <code>data/sleep_sync.log</code>.
-    </div>
-  </div>
-
-  <h3>Turning it on &amp; off</h3>
-  <p>The automation is just one entry in the Windows logon list, so it's easy to add or remove —
-     no admin, no leftovers. Removing it never touches your collected data, and the in-app
-     <strong>Sync Sleep</strong> button keeps working either way.</p>
-  <table>
-    <tr><th>Action</th><th>How</th></tr>
-    <tr>
-      <td><strong>Install</strong></td>
-      <td><code>powershell -ExecutionPolicy Bypass -File scripts\install_sleep_task.ps1</code></td>
-    </tr>
-    <tr>
-      <td><strong>Remove</strong> (command)</td>
-      <td><code>powershell -ExecutionPolicy Bypass -File scripts\uninstall_sleep_task.ps1</code></td>
-    </tr>
-    <tr>
-      <td><strong>Remove</strong> (no commands)</td>
-      <td>Task Manager → <em>Startup apps</em> → <code>GarminCoachSleepSync</code> → <em>Disable</em></td>
-    </tr>
-  </table>
-  <div class="callout blue">
-    <span class="callout-icon">🧹</span>
-    <div>
-      Removal only deletes the logon entry. Your sleep history stays in the database, and you can
-      still sync by hand anytime. To wipe every last trace, optionally delete the two bookkeeping
-      files <code>data/sleep_sync_state.json</code> and <code>data/sleep_sync.log</code> — both
-      harmless to leave.
-    </div>
-  </div>
 </div>
 
 <!-- footer -->
