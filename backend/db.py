@@ -120,6 +120,16 @@ CREATE TABLE IF NOT EXISTS sleep_nights (
     hrv_status          TEXT,
     synced_at           TEXT NOT NULL
 );
+
+-- Daily calories scraped from Garmin's calories page (7-day table). Keyed on
+-- the day, so re-scraping the same date simply overwrites it.
+CREATE TABLE IF NOT EXISTS calories (
+    day_date     TEXT PRIMARY KEY,   -- ISO date
+    activity_cal INTEGER,            -- calories burned by activity/movement
+    resting_cal  INTEGER,            -- resting (BMR) calories
+    total_cal    INTEGER,            -- activity + resting
+    synced_at    TEXT NOT NULL
+);
 """
 
 VALID_DISTANCES = ("5k", "10k", "half_marathon", "marathon")
@@ -833,3 +843,57 @@ def get_sleep_nights_summary() -> dict[str, Any]:
             """,
         ).fetchone()
     return dict(row) if row else {}
+
+
+# ───────────────────────────── Calories ──────────────────────────────────
+
+
+def upsert_calories_day(rec: dict[str, Any]) -> None:
+    """Insert or overwrite one day's calories, keyed on ``day_date``."""
+    if not rec.get("day_date"):
+        return
+    payload = {
+        "day_date":     rec.get("day_date"),
+        "activity_cal": rec.get("activity_cal"),
+        "resting_cal":  rec.get("resting_cal"),
+        "total_cal":    rec.get("total_cal"),
+        "synced_at":    datetime.utcnow().isoformat(),
+    }
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO calories (day_date, activity_cal, resting_cal, total_cal, synced_at)
+            VALUES (%(day_date)s, %(activity_cal)s, %(resting_cal)s, %(total_cal)s, %(synced_at)s)
+            ON CONFLICT (day_date) DO UPDATE SET
+                activity_cal = excluded.activity_cal,
+                resting_cal  = excluded.resting_cal,
+                total_cal    = excluded.total_cal,
+                synced_at    = excluded.synced_at
+            """,
+            payload,
+        )
+
+
+def count_calories_days() -> int:
+    with get_connection() as conn:
+        row = conn.execute("SELECT COUNT(*) AS n FROM calories").fetchone()
+    return int(row["n"]) if row else 0
+
+
+def get_calorie_dates() -> list[str]:
+    """All day_dates already stored, newest first (for the 'what's saved' check)."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT day_date FROM calories ORDER BY day_date DESC"
+        ).fetchall()
+    return [r["day_date"] for r in rows]
+
+
+def get_calories_days(limit: int = 60) -> list[dict[str, Any]]:
+    """Return the most recent N days, oldest first (for charts)."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM calories ORDER BY day_date DESC LIMIT %s",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in reversed(rows)]

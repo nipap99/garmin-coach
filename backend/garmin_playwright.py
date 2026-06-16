@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from playwright.sync_api import TimeoutError as PWTimeoutError
@@ -34,6 +34,8 @@ SPORT_URLS: dict[str, str] = {
 }
 
 SLEEP_URL = "https://connect.garmin.com/app/sleep"
+CALORIES_URL_TMPL = "https://connect.garmin.com/app/calories/{date}/1"
+_SEVEN_DAY_LABELS = ["7 ημέρες", "7 days", "7 Days"]
 
 DOWNLOAD_DIR: Path = config.PROJECT_ROOT / "data" / "CSVs"
 
@@ -207,6 +209,55 @@ def export_sleep_night() -> Path:
 def export_sleep() -> Path:
     """Export the weekly (1-year view) sleep CSV — the long-term backdrop."""
     return export_sleep_views(["weekly"])["weekly"]
+
+
+def scrape_calories() -> list[list[str]]:
+    """Scrape the calories page's 7-day table (it has no CSV export).
+
+    Opens the page, switches to the 7-day view, and reads the daily table —
+    the one whose header includes "Ημερομηνία" / "Date". Returns its raw data
+    rows as lists of cell strings: [date, activity_cal, resting_cal, total_cal].
+    """
+    url = CALORIES_URL_TMPL.format(date=date.today().isoformat())
+    with sync_playwright() as pw:
+        context = _launch_persistent(pw)
+        page = context.new_page()
+
+        logger.info("Opening %s", url)
+        page.goto(url, wait_until="domcontentloaded")
+        _wait_for_login(page)
+        if "calories" not in page.url:
+            page.goto(url, wait_until="domcontentloaded")
+
+        _select_range_view(page, _SEVEN_DAY_LABELS, "7-day")
+        page.wait_for_timeout(2_500)  # let the table render
+
+        rows = page.evaluate(
+            """() => {
+                for (const t of document.querySelectorAll("table")) {
+                    const head = t.innerText || "";
+                    if (head.includes("Ημερομηνία") || head.toLowerCase().includes("date")) {
+                        const out = [];
+                        t.querySelectorAll("tr").forEach(r => {
+                            const cells = [...r.querySelectorAll("td")]
+                                .map(c => c.innerText.trim());
+                            if (cells.length >= 4 && cells[0]) out.push(cells.slice(0, 4));
+                        });
+                        return out;
+                    }
+                }
+                return [];
+            }"""
+        )
+        context.close()
+
+    if not rows:
+        raise RuntimeError(
+            "Could not read the calories table. The page may have been slow, or "
+            "you may need to log in."
+        )
+    logger.info("Scraped %d days of calories", len(rows))
+    return rows
 
 
 def _select_range_view(page, labels: list[str], name: str) -> bool:
