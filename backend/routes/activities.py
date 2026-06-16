@@ -12,7 +12,7 @@ from pathlib import Path
 from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import HTMLResponse
 
-from .. import csv_importer, db, garmin_playwright, sleep_importer
+from .. import calories_importer, csv_importer, db, garmin_playwright, sleep_importer
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +90,24 @@ def trigger_sync_sleep() -> HTMLResponse:
     except Exception as e:  # noqa: BLE001
         logger.exception("Sleep sync failed")
         banner = f'<div class="banner error">Sleep sync failed: {type(e).__name__}: {e}</div>'
+
+    return HTMLResponse(banner)
+
+
+@router.post("/sync/calories", response_class=HTMLResponse)
+def trigger_sync_calories() -> HTMLResponse:
+    """Scrape the last 7 days of calories from Garmin and store them.
+
+    Used by the 'Sync Calories' button on the Calories tab.
+    """
+    try:
+        summary = calories_importer.scrape_and_import()
+        new, updated = len(summary["new"]), len(summary["updated"])
+        msg = f"Synced calories — {new} new day(s), {updated} refreshed."
+        banner = f'<div class="banner success">{msg}</div>'
+    except Exception as e:  # noqa: BLE001
+        logger.exception("Calories sync failed")
+        banner = f'<div class="banner error">Calories sync failed: {type(e).__name__}: {e}</div>'
 
     return HTMLResponse(banner)
 

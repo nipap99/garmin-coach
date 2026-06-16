@@ -897,3 +897,19 @@ def get_calories_days(limit: int = 60) -> list[dict[str, Any]]:
             (limit,),
         ).fetchall()
     return [dict(r) for r in reversed(rows)]
+
+
+def get_calories_summary() -> dict[str, Any]:
+    """Averages over the last 30 days for the calories stat cards."""
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                COUNT(*)                                AS days_tracked,
+                ROUND(AVG(total_cal)::numeric, 0)       AS avg_total,
+                ROUND(AVG(activity_cal)::numeric, 0)    AS avg_active,
+                ROUND(AVG(resting_cal)::numeric, 0)     AS avg_resting
+            FROM (SELECT * FROM calories ORDER BY day_date DESC LIMIT 30) recent
+            """,
+        ).fetchone()
+    return dict(row) if row else {}

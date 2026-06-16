@@ -497,6 +497,7 @@
     <button class="tab-btn active" data-tab="dashboard">Running</button>
     <button class="tab-btn" data-tab="cycling">Cycling</button>
     <button class="tab-btn" data-tab="sleep">Sleep</button>
+    <button class="tab-btn" data-tab="calories">Calories</button>
     <button class="tab-btn" data-tab="plan">Training Plan</button>
     <button class="tab-btn" data-tab="goals">Goals</button>
     <button class="tab-btn" data-tab="coach">Coach</button>
@@ -700,6 +701,50 @@
     </div>
   </div>
 
+  <!-- ── Calories ───────────────────────────────────────────────────────── -->
+  <div id="panel-calories" class="tab-panel" hidden>
+    <div class="toolbar">
+      <button class="btn"
+              hx-post="/sync/calories"
+              hx-target="#sync-status-cal"
+              hx-indicator="this"
+              title="Scrapes the last 7 days of calories from Garmin. Opens a browser — log in if prompted.">
+        Sync Calories
+      </button>
+    </div>
+    <div id="sync-status-cal"></div>
+
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="stat-value" id="cal-total">—</div>
+        <div class="stat-label">Avg Total / day</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="cal-active">—</div>
+        <div class="stat-label">Avg Active</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="cal-resting">—</div>
+        <div class="stat-label">Avg Resting</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="cal-days">—</div>
+        <div class="stat-label">Days Tracked</div>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Daily Calories <span style="font-weight:400;text-transform:none;letter-spacing:0">(resting + active)</span></h3>
+        <canvas id="chart-cal-stack"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Total Calories <span style="font-weight:400;text-transform:none;letter-spacing:0">(per day)</span></h3>
+        <canvas id="chart-cal-total"></canvas>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Training Plan ──────────────────────────────────────────────────── -->
   <div id="panel-plan" class="tab-panel" hidden>
 
@@ -844,6 +889,10 @@
     <span class="mobile-icon">&#128564;</span>
     <span>Sleep</span>
   </button>
+  <button class="mobile-tab" data-tab="calories">
+    <span class="mobile-icon">&#128293;</span>
+    <span>Calories</span>
+  </button>
   <button class="mobile-tab" data-tab="plan">
     <span class="mobile-icon">&#128197;</span>
     <span>Plan</span>
@@ -869,6 +918,7 @@ function showTab(name) {
   if (name === 'goals')     initGoals();
   if (name === 'cycling')   initCycling();
   if (name === 'sleep')     initSleep();
+  if (name === 'calories')  initCalories();
 }
 
 document.querySelectorAll('[data-tab]').forEach(btn => {
@@ -1473,6 +1523,75 @@ async function initSleep() {
   }
 }
 
+// ── Calories tab (lazy) ────────────────────────────────────────────────────
+let calReady = false;
+const _calCharts = {};
+
+async function initCalories() {
+  if (calReady) return;
+  calReady = true;
+
+  try {
+    const [summary, t] = await Promise.all([
+      fetch('/stats/calories/summary').then(r => r.json()),
+      fetch('/stats/calories/trend').then(r => r.json()),
+    ]);
+
+    document.getElementById('cal-total').textContent   = (summary.avg_total   || 0).toLocaleString();
+    document.getElementById('cal-active').textContent  = (summary.avg_active  || 0).toLocaleString();
+    document.getElementById('cal-resting').textContent = (summary.avg_resting || 0).toLocaleString();
+    document.getElementById('cal-days').textContent    = summary.days_tracked || 0;
+
+    Object.keys(_calCharts).forEach(k => { if (_calCharts[k]) { _calCharts[k].destroy(); delete _calCharts[k]; } });
+
+    if (!t.labels || !t.labels.length) return;
+
+    // Daily calories — stacked bar: resting (blue) + active (red), like Garmin
+    _calCharts.stack = new Chart(document.getElementById('chart-cal-stack'), {
+      type: 'bar',
+      data: {
+        labels: t.labels,
+        datasets: [
+          { label: 'Resting', data: t.resting, backgroundColor: 'rgba(79,140,255,0.85)' },
+          { label: 'Active',  data: t.active,  backgroundColor: 'rgba(224,82,82,0.9)' },
+        ],
+      },
+      options: {
+        ...CHART_BASE,
+        plugins: { ...CHART_BASE.plugins,
+          legend: { display: true, labels: { color: '#98a2b3', font: { size: 10 }, boxWidth: 12 } },
+          tooltip: { ...CHART_BASE.plugins.tooltip, callbacks: {
+            label: ctx => ctx.dataset.label + ' ' + ctx.raw.toLocaleString() + ' kcal' } } },
+        scales: {
+          x: { ...CHART_BASE.scales.x, stacked: true },
+          y: { ...CHART_BASE.scales.y, stacked: true, beginAtZero: true,
+               ticks: { ...CHART_BASE.scales.y.ticks, callback: v => v.toLocaleString() } },
+        },
+      },
+    });
+
+    // Total calories per day (line)
+    _calCharts.total = new Chart(document.getElementById('chart-cal-total'), {
+      type: 'line',
+      data: { labels: t.labels, datasets: [{
+        data: t.total, borderColor: '#f5a623', backgroundColor: 'rgba(245,166,35,0.10)',
+        tension: 0.35, fill: true, pointRadius: 2, pointHoverRadius: 5,
+        pointBackgroundColor: '#f5a623', spanGaps: true,
+      }] },
+      options: {
+        ...CHART_BASE,
+        plugins: { ...CHART_BASE.plugins, tooltip: { ...CHART_BASE.plugins.tooltip,
+          callbacks: { label: ctx => ctx.raw.toLocaleString() + ' kcal' } } },
+        scales: { ...CHART_BASE.scales,
+          y: { ...CHART_BASE.scales.y, beginAtZero: false,
+               ticks: { ...CHART_BASE.scales.y.ticks, callback: v => v.toLocaleString() } } },
+      },
+    });
+  } catch (err) {
+    console.error('Calories init error:', err);
+  }
+}
+
 // ── Auto-refresh dashboard + cycling after sync / CSV import ────────────────
 document.body.addEventListener('htmx:afterRequest', evt => {
   const url  = evt.detail.requestConfig?.path || '';
@@ -1483,9 +1602,11 @@ document.body.addEventListener('htmx:afterRequest', evt => {
     dashReady = false;
     cycReady = false;
     sleepReady = false;
+    calReady = false;
     if (!document.getElementById('panel-dashboard').hidden) initDashboard();
     if (!document.getElementById('panel-cycling').hidden)   initCycling();
     if (!document.getElementById('panel-sleep').hidden)     initSleep();
+    if (!document.getElementById('panel-calories').hidden)  initCalories();
   }
 });
 

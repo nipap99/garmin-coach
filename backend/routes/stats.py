@@ -224,6 +224,30 @@ def sleep_nights(limit: int = Query(60, ge=7, le=400)):
     }
 
 
+@router.get("/calories/summary")
+def calories_summary():
+    """Totals for the four calories stat cards (last 30 days)."""
+    s = db.get_calories_summary()
+    return {
+        "days_tracked": int(s["days_tracked"]) if s.get("days_tracked") else 0,
+        "avg_total":    int(s["avg_total"]) if s.get("avg_total") else 0,
+        "avg_active":   int(s["avg_active"]) if s.get("avg_active") else 0,
+        "avg_resting":  int(s["avg_resting"]) if s.get("avg_resting") else 0,
+    }
+
+
+@router.get("/calories/trend")
+def calories_trend(days: int = Query(60, ge=7, le=400)):
+    """Per-day series for the Calories charts (resting + active, total)."""
+    rows = db.get_calories_days(limit=days)
+    return {
+        "labels":  [r["day_date"] for r in rows],
+        "active":  [r["activity_cal"] for r in rows],
+        "resting": [r["resting_cal"] for r in rows],
+        "total":   [r["total_cal"] for r in rows],
+    }
+
+
 @router.get("/aerobic-efficiency")
 def aerobic_efficiency():
     """Aerobic efficiency score for each run + weekly averages for the trend line.
