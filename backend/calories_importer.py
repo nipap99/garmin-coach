@@ -19,7 +19,7 @@ from datetime import date
 from typing import Any
 
 from . import db
-from .sleep_importer import GREEK_MONTHS, _GREEK_MONTHS_PLAIN, _strip_accents
+from .greek_dates import month_number
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,7 @@ def _parse_date(text: str, ref: date) -> str | None:
     m = re.match(r"\s*([^\d\s]+)\.?\s+(\d{1,2})", text)
     if not m:
         return None
-    token = m.group(1).rstrip(".").lower()
-    month = GREEK_MONTHS.get(token) or _GREEK_MONTHS_PLAIN.get(_strip_accents(token))
+    month = month_number(m.group(1))
     if month is None:
         return None
     day = int(m.group(2))

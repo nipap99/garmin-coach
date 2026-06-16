@@ -18,36 +18,18 @@ from __future__ import annotations
 import logging
 import re
 import sys
-import unicodedata
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
 from . import db
+from .greek_dates import month_number
 
 logger = logging.getLogger(__name__)
 
 _ENCODINGS = (
     "utf-8-sig", "utf-8", "utf-16", "windows-1253", "cp1252", "iso-8859-7", "latin-1",
 )
-
-
-# Greek month abbreviations (lowercased, trailing dot stripped) → month number.
-GREEK_MONTHS: dict[str, int] = {
-    "ιαν": 1, "φεβ": 2, "μάρ": 3, "απρ": 4, "μάι": 5, "ιούν": 6,
-    "ιούλ": 7, "αύγ": 8, "σεπ": 9, "οκτ": 10, "νοέμ": 11, "δεκ": 12,
-}
-
-
-def _strip_accents(text: str) -> str:
-    return "".join(
-        c for c in unicodedata.normalize("NFD", text)
-        if unicodedata.category(c) != "Mn"
-    )
-
-
-# Accent-stripped fallback (e.g. "μαι" → 5) so minor variants still resolve.
-_GREEK_MONTHS_PLAIN = {_strip_accents(k): v for k, v in GREEK_MONTHS.items()}
 
 
 # ── field parsers ────────────────────────────────────────────────────────────
@@ -112,8 +94,7 @@ def _parse_week_label(label: str) -> tuple[int, int, int | None] | None:
     m = re.match(r"\s*([^\d\s]+)\.?\s+(\d{1,2})", start_part)
     if not m:
         return None
-    token = m.group(1).rstrip(".").lower()
-    month = GREEK_MONTHS.get(token) or _GREEK_MONTHS_PLAIN.get(_strip_accents(token))
+    month = month_number(m.group(1))
     if month is None:
         return None
     return month, int(m.group(2)), explicit_year
