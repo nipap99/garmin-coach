@@ -108,11 +108,13 @@ def export_activities(sports: list[str] | None = None) -> list[Path]:
 def _export_one_sport(page, sport: str, navigate: bool = True) -> Path:
     """Export one sport's CSV.
 
-    ``navigate`` controls the slow path: when True (switching to a different
-    sport) we reload the filtered view and wait for the network to settle so
-    the activity list actually changes before we export. For the first sport
-    we're already on the page, so we skip both — keeping single-sport syncs
-    as fast as the original running-only export.
+    ``navigate`` is True when switching to a different sport: we reload the
+    filtered view, give the SPA a brief moment to apply the activity-type
+    filter, then export. (We deliberately avoid a 'networkidle' wait here —
+    Garmin's page polls in the background and rarely goes idle, so that wait
+    used to stall for ~20s. The short settle below is enough for the filtered
+    list to load.) For the first sport we're already on the page, so we skip
+    straight to the export.
     """
     url = SPORT_URLS[sport]
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
@@ -121,11 +123,7 @@ def _export_one_sport(page, sport: str, navigate: bool = True) -> Path:
     if navigate:
         logger.info("Switching to %s view…", sport)
         page.goto(url, wait_until="domcontentloaded")
-        # Let the SPA reload the filtered activity list before exporting
-        try:
-            page.wait_for_load_state("networkidle", timeout=20_000)
-        except PWTimeoutError:
-            pass  # networkidle is unreliable on SPAs; carry on
+        page.wait_for_timeout(2_000)  # let the SPA apply the activity-type filter
 
     logger.info("Waiting for Export CSV button (%s)…", sport)
     export_btn = _wait_for_export_button(page, timeout=45_000)
