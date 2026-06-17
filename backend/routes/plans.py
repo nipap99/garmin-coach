@@ -18,6 +18,7 @@ from fastapi import APIRouter, Form
 from fastapi.responses import HTMLResponse
 
 from .. import config, db
+from ..coach import load_persona
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/plans", tags=["plans"])
@@ -123,11 +124,17 @@ def _generate_plan_json(
     days_dates = [(next_mon + timedelta(i)).isoformat() for i in range(7)]
     day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
+    persona = load_persona()
+    persona_block = (
+        f"\nThe runner wrote these coaching preferences — honor them:\n{persona}\n"
+        if persona else ""
+    )
+
     prompt = f"""You are a running coach. Generate a 7-day training plan for next week.
 
 Today: {date.today().isoformat()}
 Week: {next_mon.isoformat()} (Mon) to {days_dates[6]} (Sun)
-
+{persona_block}
 Recent running (last 30 days):
 {_activities_text(activities)}
 

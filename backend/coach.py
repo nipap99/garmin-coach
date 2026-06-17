@@ -25,6 +25,23 @@ logger = logging.getLogger(__name__)
 MODEL = "claude-opus-4-7"
 MAX_TOOL_ITERATIONS = 8
 
+PERSONA_FILE = config.PROJECT_ROOT / "coach_persona.md"
+
+
+def load_persona() -> str:
+    """Read the user-editable coaching-preferences file, or '' if absent.
+
+    This lets the user steer the coach in plain English without code changes —
+    both the chat and the weekly-plan generator append it to their prompts.
+    """
+    try:
+        return PERSONA_FILE.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return ""
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not read coach persona file")
+        return ""
+
 
 SYSTEM_PROMPT = """You are a personal running coach helping the user train for their goals (currently a 5K and a half marathon).
 
@@ -250,6 +267,15 @@ def chat(
     client = _client()
     today = date.today().isoformat()
 
+    # The user's editable preferences shape every turn.
+    persona = load_persona()
+    system_text = SYSTEM_PROMPT
+    if persona:
+        system_text += (
+            "\n\n---\nTHE USER'S OWN COACHING PREFERENCES (they wrote these — "
+            "honor them, especially for plans):\n\n" + persona
+        )
+
     # Build the messages list for this turn.
     messages: list[dict[str, Any]] = list(history or [])
     messages.append(
@@ -268,7 +294,7 @@ def chat(
             system=[
                 {
                     "type": "text",
-                    "text": SYSTEM_PROMPT,
+                    "text": system_text,
                     "cache_control": {"type": "ephemeral"},
                 }
             ],
