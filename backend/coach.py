@@ -28,23 +28,30 @@ MAX_TOOL_ITERATIONS = 8
 
 SYSTEM_PROMPT = """You are a personal running coach helping the user train for their goals (currently a 5K and a half marathon).
 
-The user's training data lives in a local database. Use the provided tools to fetch:
+The user's training and recovery data lives in a local database. Use the provided tools to fetch:
 - recent running activities (pace, HR, distance, duration, VO2max, elevation)
-- active race goals (target distance, optional target time, optional target date)
-- personal-record progression at standard distances (5K, 10K, half marathon, marathon)
+- recent CYCLING rides — a secondary aerobic activity the user does for transport/fitness (distance, duration, avg speed, HR, calories)
+- recent SLEEP — nightly recovery (sleep score, total/deep/REM duration, HRV in ms, resting HR)
+- recent daily CALORIES (total, active, resting) — energy-expenditure context
+- active race goals, and personal-record progression at standard distances
 
 When the user asks a question, ground your answer in their actual numbers — pull the data with tools before answering. Don't speculate from general knowledge when the data is one tool call away.
 
+Treat the athlete holistically — running is the goal, but cycling and sleep change the right prescription:
+- CYCLING is cross-training that adds real aerobic load and fatigue. Count it toward the week's total load. After a long or hard ride, don't stack a hard run the next day. An easy spin can serve as active recovery. If cycling volume is high, the running plan has less room before overreaching.
+- SLEEP & HRV are the recovery signal. Short sleep, a downward HRV trend, or elevated resting HR mean the body is under-recovered → bias toward easier sessions, more rest, or moving hard workouts later. Good sleep and rising HRV mean the athlete can absorb harder work. Always sanity-check intensity against recent recovery.
+- CALORIES give rough energy context — large deficits alongside hard training are a fueling/recovery red flag worth mentioning.
+
 Your responsibilities:
-1. Validate training — flag when effort doesn't match intent (e.g. easy runs done with HR that's clearly too high).
+1. Validate training — flag when effort doesn't match intent (e.g. easy runs with HR too high), AND when running load ignores cycling fatigue or poor recovery.
 2. Provide concrete insights citing specific numbers and dates from the data.
-3. When asked for a plan, propose a 7-day weekly schedule with one line of reasoning per day. Format as a list. Plans are suggestions the user can accept, edit, or regenerate.
+3. When asked for a plan, propose a 7-day weekly schedule with one line of reasoning per day, balancing run + bike load and scheduling intensity around recovery. Plans are suggestions the user can accept, edit, or regenerate.
 4. Be candid but supportive. Lead with numbers, not platitudes.
 
 Style:
 - Concise. Skip preambles like "Great question" or "Based on your data".
 - Use bullets and short paragraphs.
-- Cite specific dates and figures (e.g. "your 5K pace dropped from 5:10 to 4:58 between Mar 12 and May 4").
+- Cite specific dates and figures (e.g. "your 5K pace dropped from 5:10 to 4:58 between Mar 12 and May 4"; "HRV fell from 86 to 71 ms over 4 nights").
 - If the data is missing or thin, say so plainly and tell the user what to sync or log."""
 
 
@@ -63,6 +70,67 @@ TOOLS: list[dict[str, Any]] = [
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 365,
+                    "description": "Number of days to look back from today.",
+                },
+            },
+            "required": ["days"],
+        },
+    },
+    {
+        "name": "get_recent_cycling",
+        "description": (
+            "Fetch the user's CYCLING rides from the last N days — a secondary "
+            "aerobic activity (cross-training). Each ride includes date, "
+            "distance_km, duration_min, avg_speed_kmh, avg_hr, calories. Use to "
+            "gauge total training load and fatigue beyond running."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 365,
+                    "description": "Number of days to look back from today.",
+                },
+            },
+            "required": ["days"],
+        },
+    },
+    {
+        "name": "get_recent_sleep",
+        "description": (
+            "Fetch the user's recent nightly SLEEP — the recovery signal. Each "
+            "night includes date, score (0-100), duration_min, deep_min, rem_min, "
+            "hrv_ms, resting_hr. Short sleep, low/declining HRV, or elevated "
+            "resting HR mean prioritize easier training or rest."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "nights": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 120,
+                    "description": "Number of recent nights to fetch.",
+                },
+            },
+            "required": ["nights"],
+        },
+    },
+    {
+        "name": "get_recent_calories",
+        "description": (
+            "Fetch the user's recent daily CALORIES for energy-expenditure "
+            "context. Each day includes date, total_cal, activity_cal, resting_cal."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 120,
                     "description": "Number of days to look back from today.",
                 },
             },
@@ -116,6 +184,24 @@ def _run_tool(name: str, args: dict[str, Any]) -> str:
         # Strip raw_json + synced_at — not useful for the model, just tokens.
         for r in rows:
             r.pop("raw_json", None)
+            r.pop("synced_at", None)
+        return json.dumps(rows, default=str)
+
+    if name == "get_recent_cycling":
+        days = int(args.get("days", 30))
+        return json.dumps(db.get_recent_cycling(days=days), default=str)
+
+    if name == "get_recent_sleep":
+        nights = int(args.get("nights", 14))
+        rows = db.get_sleep_nights(limit=nights)
+        for r in rows:
+            r.pop("synced_at", None)
+        return json.dumps(rows, default=str)
+
+    if name == "get_recent_calories":
+        days = int(args.get("days", 14))
+        rows = db.get_calories_days(limit=days)
+        for r in rows:
             r.pop("synced_at", None)
         return json.dumps(rows, default=str)
 

@@ -82,7 +82,42 @@ def _goals_text(goals: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _generate_plan_json(activities: list[dict], goals: list[dict]) -> dict[str, Any]:
+def _cycling_text(rides: list[dict]) -> str:
+    if not rides:
+        return "  No recent rides."
+    lines = []
+    for a in rides[:14]:
+        spd = a.get("avg_speed_kmh")
+        spd_str = f"{float(spd):.1f} km/h" if spd else "—"
+        lines.append(
+            f"  {(a.get('start_local') or '')[:10]}  "
+            f"{(a.get('distance_km') or 0):.1f} km  "
+            f"{(a.get('duration_min') or 0):.0f} min  "
+            f"{spd_str}  HR {a.get('avg_hr') or '—'}"
+        )
+    return "\n".join(lines)
+
+
+def _sleep_text(nights: list[dict]) -> str:
+    if not nights:
+        return "  No recent sleep data."
+    lines = []
+    for n in nights[-10:]:  # nights are oldest-first; show the most recent 10
+        dur = n.get("duration_min")
+        dur_str = f"{int(dur) // 60}h{int(dur) % 60:02d}" if dur else "—"
+        lines.append(
+            f"  {n.get('night_date')}  score {n.get('score') or '—'}  "
+            f"{dur_str}  HRV {n.get('hrv_ms') or '—'}ms  RHR {n.get('resting_hr') or '—'}"
+        )
+    return "\n".join(lines)
+
+
+def _generate_plan_json(
+    activities: list[dict],
+    goals: list[dict],
+    rides: list[dict] | None = None,
+    nights: list[dict] | None = None,
+) -> dict[str, Any]:
     """Call Claude and return the validated plan dict."""
     next_mon = _next_monday()
     days_dates = [(next_mon + timedelta(i)).isoformat() for i in range(7)]
@@ -93,8 +128,14 @@ def _generate_plan_json(activities: list[dict], goals: list[dict]) -> dict[str, 
 Today: {date.today().isoformat()}
 Week: {next_mon.isoformat()} (Mon) to {days_dates[6]} (Sun)
 
-Recent training (last 30 days):
+Recent running (last 30 days):
 {_activities_text(activities)}
+
+Recent cycling (cross-training — adds aerobic load/fatigue, counts toward the week):
+{_cycling_text(rides or [])}
+
+Recent sleep (recovery — bias intensity to recent sleep score / HRV / resting HR):
+{_sleep_text(nights or [])}
 
 Runner's goals:
 {_goals_text(goals)}
@@ -123,6 +164,8 @@ Rules:
 - workout_type: one of easy, tempo, intervals, long, rest, cross
 - intensity: one of easy, moderate, hard, rest
 - Base the plan on the runner's recent weekly mileage — don't jump more than 10%
+- Account for cycling load: if cycling volume is high, leave less room for hard running and avoid stacking a hard run right after a long/hard ride
+- Account for recovery: if recent sleep is short or HRV is trending down / resting HR is up, bias toward easier sessions and place hard workouts on better-recovered days
 - For rest days: distance_km = 0, duration_min = 0
 - Be specific with targets (e.g. "5:30–5:45/km", "HR below 148")"""
 
@@ -390,7 +433,9 @@ def generate_plan() -> HTMLResponse:
     try:
         activities = db.get_recent_activities(days=30)
         goals = db.list_goals(status="active")
-        plan_json = _generate_plan_json(activities, goals)
+        rides = db.get_recent_cycling(days=14)
+        nights = db.get_sleep_nights(limit=14)
+        plan_json = _generate_plan_json(activities, goals, rides, nights)
         week_start = plan_json.get("week_start", _next_monday().isoformat())
         db.create_weekly_plan(week_start, plan_json)
     except Exception as exc:

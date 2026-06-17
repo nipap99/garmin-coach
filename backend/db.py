@@ -277,6 +277,28 @@ def get_recent_activities(days: int = 30, limit: int = 200) -> list[dict[str, An
     return [dict(r) for r in rows]
 
 
+def get_recent_cycling(days: int = 30, limit: int = 200) -> list[dict[str, Any]]:
+    """Return cycling rides from the last ``days`` days, newest first.
+
+    Used as cross-training context for the running coach.
+    """
+    cutoff = (date.today() - timedelta(days=days)).isoformat()
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT start_local, name, distance_km, duration_min,
+                   avg_speed_kmh, avg_hr, calories
+            FROM activities
+            WHERE start_local >= %s
+              AND activity_type = 'cycling'
+            ORDER BY start_local DESC
+            LIMIT %s
+            """,
+            (cutoff, limit),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def get_activity_by_id(activity_id: int) -> dict[str, Any] | None:
     """Return a single activity row by primary key, or None if not found."""
     with get_connection() as conn:
