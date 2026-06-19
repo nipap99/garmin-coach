@@ -888,6 +888,10 @@
   <div id="panel-food" class="tab-panel" hidden>
     <div id="food-today" class="today-macros"
          hx-get="/food/today" hx-trigger="load"></div>
+    <div class="chart-card" style="margin-bottom:0.9rem">
+      <h3>Daily Macros <span style="font-weight:400;text-transform:none;letter-spacing:0">(grams · protein / carbs / fat — calories on top)</span></h3>
+      <canvas id="chart-nutrition"></canvas>
+    </div>
     <div id="food-history"
          class="panel"
          hx-get="/food/history"
@@ -902,7 +906,8 @@
           hx-disabled-elt="find button, find textarea"
           hx-on::after-request="this.reset();
             this.querySelector('.food-photo-name').textContent='';
-            document.getElementById('food-history').scrollTop=99999">
+            document.getElementById('food-history').scrollTop=99999;
+            if (event.detail.successful) initFood();">
       <textarea name="message"
                 placeholder="Tell me what you ate (e.g. '200g chicken, 150g rice') — or attach a photo"></textarea>
       <label title="Attach a food photo"
@@ -973,6 +978,7 @@ function showTab(name) {
   if (name === 'cycling')   initCycling();
   if (name === 'sleep')     initSleep();
   if (name === 'calories')  initCalories();
+  if (name === 'food')      initFood();
 }
 
 document.querySelectorAll('[data-tab]').forEach(btn => {
@@ -1643,6 +1649,78 @@ async function initCalories() {
     });
   } catch (err) {
     console.error('Calories init error:', err);
+  }
+}
+
+// ── Food: daily-macros bar chart (rebuilt on open and after each log) ───────
+let _foodChart = null;
+
+async function initFood() {
+  try {
+    const t = await fetch('/stats/nutrition/trend').then(r => r.json());
+    const el = document.getElementById('chart-nutrition');
+    if (!el) return;
+    if (_foodChart) { _foodChart.destroy(); _foodChart = null; }
+    if (!t.labels || !t.labels.length) return;  // nothing logged yet
+
+    // Custom plugin: grams in each segment, total kcal on top of each bar.
+    const labelPlugin = {
+      id: 'macroLabels',
+      afterDatasetsDraw(chart) {
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.textAlign = 'center';
+        // grams centered in each stack segment
+        ctx.font = '600 10px Inter, sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.textBaseline = 'middle';
+        chart.data.datasets.forEach((ds, di) => {
+          chart.getDatasetMeta(di).data.forEach((bar, i) => {
+            const v = ds.data[i];
+            if (!v || Math.abs(bar.base - bar.y) < 13) return;
+            ctx.fillText(Math.round(v) + 'g', bar.x, (bar.y + bar.base) / 2);
+          });
+        });
+        // total kcal above the top of each bar
+        ctx.font = '700 11px Inter, sans-serif';
+        ctx.fillStyle = '#e6e8eb';
+        ctx.textBaseline = 'bottom';
+        chart.getDatasetMeta(chart.data.datasets.length - 1).data.forEach((bar, i) => {
+          if (!t.kcal[i]) return;
+          ctx.fillText(t.kcal[i].toLocaleString() + ' kcal', bar.x, bar.y - 5);
+        });
+        ctx.restore();
+      },
+    };
+
+    _foodChart = new Chart(el, {
+      type: 'bar',
+      data: {
+        labels: t.labels,
+        datasets: [
+          { label: 'Protein', data: t.protein_g, backgroundColor: '#4f8cff' },
+          { label: 'Carbs',   data: t.carbs_g,   backgroundColor: '#f5a623' },
+          { label: 'Fat',     data: t.fat_g,     backgroundColor: '#e05252' },
+        ],
+      },
+      options: {
+        ...CHART_BASE,
+        plugins: {
+          ...CHART_BASE.plugins,
+          legend: { display: true, labels: { color: '#98a2b3', font: { size: 10 }, boxWidth: 12 } },
+          tooltip: { ...CHART_BASE.plugins.tooltip, callbacks: {
+            label: ctx => ctx.dataset.label + ' ' + Math.round(ctx.raw) + ' g' } },
+        },
+        scales: {
+          x: { ...CHART_BASE.scales.x, stacked: true },
+          y: { ...CHART_BASE.scales.y, stacked: true, beginAtZero: true, grace: '14%',
+               ticks: { ...CHART_BASE.scales.y.ticks, callback: v => v + ' g' } },
+        },
+      },
+      plugins: [labelPlugin],
+    });
+  } catch (e) {
+    console.error('Food chart error:', e);
   }
 }
 

@@ -248,6 +248,19 @@ def calories_trend(days: int = Query(60, ge=7, le=400)):
     }
 
 
+@router.get("/nutrition/trend")
+def nutrition_trend(days: int = Query(14, ge=3, le=120)):
+    """Per-day macro grams + total calories for the Food-tab bar chart."""
+    rows = db.get_nutrition_days(limit=days)
+    return {
+        "labels":    [r["log_date"] for r in rows],
+        "protein_g": [float(r["protein_g"] or 0) for r in rows],
+        "carbs_g":   [float(r["carbs_g"] or 0) for r in rows],
+        "fat_g":     [float(r["fat_g"] or 0) for r in rows],
+        "kcal":      [int(r["kcal"] or 0) for r in rows],
+    }
+
+
 @router.get("/aerobic-efficiency")
 def aerobic_efficiency():
     """Aerobic efficiency score for each run + weekly averages for the trend line.
