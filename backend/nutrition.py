@@ -36,6 +36,10 @@ For each food the user mentions:
 3. If it does NOT exist, estimate typical per-100g values from your nutrition knowledge, show the user your estimate (e.g. "chicken breast ≈ 165 kcal, 31g protein, 3.6g fat, 0g carbs per 100g"), and ask them to confirm or correct. Only after they confirm (or give exact numbers) do add_food, then log_food.
 4. After logging, report what you logged and the new running daily total.
 
+If the user sends a PHOTO of food:
+- Identify each food in the image and estimate its portion in grams from visual cues (plate size, typical servings). State your gram estimates and that they're approximate.
+- Then proceed exactly as above (find_food / add_food / log_food). If you're unsure what a food is, ask before logging.
+
 Rules:
 - Always log in grams; be explicit about the gram amount you used.
 - Use the user's exact figures when they give them; otherwise estimate and clearly label it an estimate.
@@ -147,13 +151,37 @@ def _run_tool(name: str, args: dict[str, Any]) -> str:
     return json.dumps({"error": f"unknown tool: {name}"})
 
 
-def chat(user_message: str, history: list[dict[str, Any]] | None = None) -> str:
-    """Send a user message through the nutrition agent and return the reply text."""
+def chat(
+    user_message: str,
+    history: list[dict[str, Any]] | None = None,
+    image: dict[str, str] | None = None,
+) -> str:
+    """Send a user message (and optional food photo) through the nutrition agent.
+
+    ``image`` is ``{"media_type": "image/jpeg", "data": "<base64>"}`` when the
+    user attached a photo; it's included as an image block in the current turn.
+    """
     client = Anthropic(api_key=config.ANTHROPIC_API_KEY)
     today = date.today().isoformat()
 
+    text_block = {"type": "text", "text": f"[today: {today}]\n\n{user_message}"}
+    if image:
+        content: Any = [
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": image["media_type"],
+                    "data": image["data"],
+                },
+            },
+            text_block,
+        ]
+    else:
+        content = f"[today: {today}]\n\n{user_message}"
+
     messages: list[dict[str, Any]] = list(history or [])
-    messages.append({"role": "user", "content": f"[today: {today}]\n\n{user_message}"})
+    messages.append({"role": "user", "content": content})
 
     final_text = ""
     for _ in range(MAX_TOOL_ITERATIONS):

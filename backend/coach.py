@@ -49,7 +49,8 @@ The user's training and recovery data lives in a local database. Use the provide
 - recent running activities (pace, HR, distance, duration, VO2max, elevation)
 - recent CYCLING rides — a secondary aerobic activity the user does for transport/fitness (distance, duration, avg speed, HR, calories)
 - recent SLEEP — nightly recovery (sleep score, total/deep/REM duration, HRV in ms, resting HR)
-- recent daily CALORIES (total, active, resting) — energy-expenditure context
+- recent daily CALORIES BURNED (total, active, resting) — energy-expenditure context
+- logged FOOD INTAKE — what the user ate each day (calories eaten + protein/fat/carbs grams)
 - active race goals, and personal-record progression at standard distances
 
 When the user asks a question, ground your answer in their actual numbers — pull the data with tools before answering. Don't speculate from general knowledge when the data is one tool call away.
@@ -57,7 +58,7 @@ When the user asks a question, ground your answer in their actual numbers — pu
 Treat the athlete holistically — running is the goal, but cycling and sleep change the right prescription:
 - CYCLING is cross-training that adds real aerobic load and fatigue. Count it toward the week's total load. After a long or hard ride, don't stack a hard run the next day. An easy spin can serve as active recovery. If cycling volume is high, the running plan has less room before overreaching.
 - SLEEP & HRV are the recovery signal. Short sleep, a downward HRV trend, or elevated resting HR mean the body is under-recovered → bias toward easier sessions, more rest, or moving hard workouts later. Good sleep and rising HRV mean the athlete can absorb harder work. Always sanity-check intensity against recent recovery.
-- CALORIES give rough energy context — large deficits alongside hard training are a fueling/recovery red flag worth mentioning.
+- ENERGY BALANCE & FUELLING — the user logs the food they eat. Compare intake (get_recent_nutrition: calories + protein/fat/carbs eaten) against what they burn (calories burned + training). Flag a large deficit during hard training, low protein for recovery, or days with no food logged. Intake data may be sparse — say so plainly if it's thin rather than guessing.
 
 Your responsibilities:
 1. Validate training — flag when effort doesn't match intent (e.g. easy runs with HR too high), AND when running load ignores cycling fatigue or poor recovery.
@@ -138,8 +139,29 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": "get_recent_calories",
         "description": (
-            "Fetch the user's recent daily CALORIES for energy-expenditure "
+            "Fetch the user's recent daily CALORIES BURNED for energy-expenditure "
             "context. Each day includes date, total_cal, activity_cal, resting_cal."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 120,
+                    "description": "Number of days to look back from today.",
+                },
+            },
+            "required": ["days"],
+        },
+    },
+    {
+        "name": "get_recent_nutrition",
+        "description": (
+            "Fetch the user's logged daily FOOD INTAKE (what they ate) for the "
+            "last N days — each day's total calories eaten plus protein, fat, and "
+            "carbs in grams. Compare with calories burned for energy balance and "
+            "fuelling checks."
         ),
         "input_schema": {
             "type": "object",
@@ -221,6 +243,10 @@ def _run_tool(name: str, args: dict[str, Any]) -> str:
         for r in rows:
             r.pop("synced_at", None)
         return json.dumps(rows, default=str)
+
+    if name == "get_recent_nutrition":
+        days = int(args.get("days", 14))
+        return json.dumps(db.get_nutrition_days(limit=days), default=str)
 
     if name == "get_goals":
         return json.dumps(db.list_goals(status="active"), default=str)

@@ -896,14 +896,23 @@
     </div>
     <form class="chat-form"
           hx-post="/food"
+          hx-encoding="multipart/form-data"
           hx-target="#food-history"
           hx-swap="beforeend scroll:bottom"
           hx-disabled-elt="find button, find textarea"
           hx-on::after-request="this.reset();
+            this.querySelector('.food-photo-name').textContent='';
             document.getElementById('food-history').scrollTop=99999">
       <textarea name="message"
-                placeholder="Tell me what you ate… e.g. '200g chicken breast and 150g rice'"
-                required></textarea>
+                placeholder="Tell me what you ate (e.g. '200g chicken, 150g rice') — or attach a photo"></textarea>
+      <label title="Attach a food photo"
+             style="cursor:pointer;padding:0.5rem 0.7rem;background:var(--panel);
+                    border:1px solid var(--border);border-radius:var(--radius);font-size:1.1rem">
+        📷
+        <input type="file" name="photo" accept="image/*" style="display:none"
+               onchange="this.closest('form').querySelector('.food-photo-name').textContent=this.files[0]?this.files[0].name:''">
+      </label>
+      <span class="food-photo-name" style="font-size:0.74rem;color:var(--muted);align-self:center"></span>
       <button class="btn" type="submit">Log</button>
     </form>
     <div style="margin-top:0.5rem">

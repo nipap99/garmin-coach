@@ -1,12 +1,15 @@
 """Routes for the nutrition (food) agent chat + today's totals."""
 from __future__ import annotations
 
+import base64
+import io
 import logging
 from datetime import date
 from html import escape
 
-from fastapi import APIRouter, Form
+from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import HTMLResponse
+from PIL import Image
 
 from .. import db, nutrition
 
@@ -62,21 +65,55 @@ def get_history() -> HTMLResponse:
     return HTMLResponse(_render_history(rows))
 
 
+def _process_image(photo: UploadFile) -> dict[str, str]:
+    """Downscale an uploaded food photo and return a base64 JPEG for the model."""
+    raw = photo.file.read()
+    img = Image.open(io.BytesIO(raw)).convert("RGB")
+    img.thumbnail((1568, 1568))  # Anthropic's recommended max long side
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=85)
+    return {
+        "media_type": "image/jpeg",
+        "data": base64.standard_b64encode(buf.getvalue()).decode(),
+    }
+
+
 @router.post("", response_class=HTMLResponse)
-def post_message(message: str = Form(...)) -> HTMLResponse:
+def post_message(
+    message: str = Form(""),
+    photo: UploadFile | None = File(None),
+) -> HTMLResponse:
     message = (message or "").strip()
-    if not message:
+
+    image: dict[str, str] | None = None
+    if photo is not None and photo.filename:
+        try:
+            image = _process_image(photo)
+        except Exception:  # noqa: BLE001
+            logger.exception("Could not process food photo")
+            return HTMLResponse(_render_message(
+                "assistant", "(couldn't read that image — try a JPEG or PNG)"))
+
+    if not message and image is None:
         return HTMLResponse("")
 
-    db.append_chat_message("user", message, channel=CHANNEL)
+    # What we store/show as the user's turn (the image itself isn't kept).
+    if image is not None:
+        user_display = ("📷 " + message) if message else "📷 (food photo)"
+    else:
+        user_display = message
+    db.append_chat_message("user", user_display, channel=CHANNEL)
 
     history_rows = db.get_chat_history(limit=20, channel=CHANNEL)
     if history_rows and history_rows[-1]["role"] == "user":
         history_rows = history_rows[:-1]
     history = [{"role": r["role"], "content": r["content"]} for r in history_rows]
 
+    agent_message = message or (
+        "Identify the food in this photo, estimate the portions in grams, and log them."
+    )
     try:
-        reply = nutrition.chat(message, history=history)
+        reply = nutrition.chat(agent_message, history=history, image=image)
     except Exception as e:  # noqa: BLE001
         logger.exception("Nutrition agent call failed")
         reply = f"(nutrition error: {type(e).__name__}: {e})"
@@ -89,7 +126,7 @@ def post_message(message: str = Form(...)) -> HTMLResponse:
         f'{_today_spans()}</div>'
     )
     return HTMLResponse(
-        _render_message("user", message) + _render_message("assistant", reply) + oob
+        _render_message("user", user_display) + _render_message("assistant", reply) + oob
     )
 
 
