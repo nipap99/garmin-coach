@@ -272,7 +272,7 @@
     .goal-notes { color: var(--muted); font-size: 0.82rem; margin-top: 0.2rem; }
 
     /* ── Chat ─────────────────────────────────────────────────────────────── */
-    #chat-history {
+    #chat-history, #food-history {
       max-height: 460px;
       overflow-y: auto;
       display: flex;
@@ -280,6 +280,16 @@
       gap: 0.6rem;
       padding: 1rem;
     }
+
+    /* ── Food: today's totals bar ─────────────────────────────────────────── */
+    .today-macros {
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.9rem;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 0.7rem 1rem; margin-bottom: 0.9rem;
+    }
+    .today-macros .tm-kcal { font-size: 1.15rem; font-weight: 700; color: #f5a623; }
+    .today-macros .tm-macro { font-size: 0.9rem; font-weight: 600; color: var(--text); }
+    .today-macros .tm-items { font-size: 0.78rem; color: var(--muted); margin-left: auto; }
     .msg { padding: 0.65rem 0.9rem; border-radius: var(--radius); line-height: 1.55; }
     .msg-role { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.25rem; }
     .msg-body { font-size: 0.92rem; white-space: pre-wrap; }
@@ -501,6 +511,7 @@
     <button class="tab-btn" data-tab="plan">Training Plan</button>
     <button class="tab-btn" data-tab="goals">Goals</button>
     <button class="tab-btn" data-tab="coach">Coach</button>
+    <button class="tab-btn" data-tab="food">Food</button>
   </nav>
 </header>
 
@@ -873,6 +884,36 @@
     </div>
   </div>
 
+  <!-- ── Food (Nutrition) ───────────────────────────────────────────────── -->
+  <div id="panel-food" class="tab-panel" hidden>
+    <div id="food-today" class="today-macros"
+         hx-get="/food/today" hx-trigger="load"></div>
+    <div id="food-history"
+         class="panel"
+         hx-get="/food/history"
+         hx-trigger="load">
+      <div class="empty">Loading…</div>
+    </div>
+    <form class="chat-form"
+          hx-post="/food"
+          hx-target="#food-history"
+          hx-swap="beforeend scroll:bottom"
+          hx-disabled-elt="find button, find textarea"
+          hx-on::after-request="this.reset();
+            document.getElementById('food-history').scrollTop=99999">
+      <textarea name="message"
+                placeholder="Tell me what you ate… e.g. '200g chicken breast and 150g rice'"
+                required></textarea>
+      <button class="btn" type="submit">Log</button>
+    </form>
+    <div style="margin-top:0.5rem">
+      <button class="btn btn-small btn-danger"
+              hx-post="/food/clear"
+              hx-target="#food-history"
+              hx-confirm="Clear food chat? (Your logged food data stays.)">Clear chat</button>
+    </div>
+  </div>
+
 </main>
 
 <!-- ── Mobile bottom nav ───────────────────────────────────────────────── -->
@@ -904,6 +945,10 @@
   <button class="mobile-tab" data-tab="coach">
     <span class="mobile-icon">&#128172;</span>
     <span>Coach</span>
+  </button>
+  <button class="mobile-tab" data-tab="food">
+    <span class="mobile-icon">&#127869;</span>
+    <span>Food</span>
   </button>
 </nav>
 

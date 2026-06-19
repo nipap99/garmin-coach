@@ -15,6 +15,7 @@ from . import config
 from .routes import activities as activities_routes
 from .routes import chat as chat_routes
 from .routes import goals as goals_routes
+from .routes import nutrition as nutrition_routes
 from .routes import plans as plans_routes
 from .routes import stats as stats_routes
 
@@ -40,6 +41,7 @@ app.include_router(goals_routes.router)
 app.include_router(chat_routes.router)
 app.include_router(stats_routes.router)
 app.include_router(plans_routes.router)
+app.include_router(nutrition_routes.router)
 
 
 @app.get("/", response_class=HTMLResponse)
