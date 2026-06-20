@@ -333,9 +333,9 @@
   <div class="cover-tag">Technical Documentation</div>
   <h1>Garmin <span>Coach</span><br>App</h1>
   <p class="cover-sub">
-    A local AI-powered endurance coach that ingests Garmin <strong>running,
-    cycling and sleep</strong> data, visualises it, and generates personalised
-    weekly plans with the Claude API.
+    A local AI app that ingests Garmin <strong>running, cycling, sleep and
+    calories</strong> data, lets you log <strong>food</strong> (by text or photo),
+    and runs two Claude agents — a holistic running coach and a nutrition logger.
   </p>
   <div class="cover-meta">
     <div class="cover-meta-item">
@@ -348,7 +348,7 @@
     </div>
     <div class="cover-meta-item">
       <span class="cover-meta-label">Version</span>
-      <span class="cover-meta-value">3.0 · sleep tracking</span>
+      <span class="cover-meta-value">4.0 · nutrition + holistic coach</span>
     </div>
   </div>
   <div class="cover-badge-row">
@@ -380,6 +380,7 @@
     <li><span class="toc-num">10</span><span class="toc-title">File reference</span><span class="toc-dots"></span></li>
     <li><span class="toc-num">11</span><span class="toc-title">Technology choices</span><span class="toc-dots"></span></li>
     <li><span class="toc-num">12</span><span class="toc-title">Sleep tracking</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">13</span><span class="toc-title">Calories &amp; the nutrition agent</span><span class="toc-dots"></span></li>
   </ul>
 </div>
 
@@ -413,6 +414,9 @@
     <li><strong>AI coaching chat</strong> — streaming conversation with real-time context from your activities</li>
     <li><strong>Goals &amp; fitness tracking</strong> — race targets plus an aerobic-efficiency trend (speed ÷ heart rate over time)</li>
     <li><strong>Sleep tab</strong> — per-night detail (deep/light/REM stages, HRV, recovery metrics) over a weekly long-term backdrop, synced on demand</li>
+    <li><strong>Calories tab</strong> — daily calories burned (resting + active), scraped from Garmin's table (no CSV export exists for it)</li>
+    <li><strong>Food / nutrition agent</strong> — a second Claude agent: tell it what you ate (text or photo) and it logs each item, builds a personal food library, and tracks daily protein/fat/carbs/kcal</li>
+    <li><strong>Holistic coach</strong> — the running coach factors in cycling load, sleep recovery, and food intake (energy in vs out), steered by an editable plain-English preferences file</li>
   </ul>
 
   <div class="callout blue">
@@ -459,6 +463,10 @@
           <span class="muted" style="font-size:0.72rem">nightly stages·HRV<br>weekly backdrop</span>
         </div>
         <div class="arch-box" style="background:#0f1117">
+          <span class="blue">🔥 Calories</span><br>
+          <span class="muted" style="font-size:0.72rem">burned: rest+active<br>scraped table</span>
+        </div>
+        <div class="arch-box" style="background:#0f1117">
           <span class="blue">📅 Plan</span><br>
           <span class="muted" style="font-size:0.72rem">generate / paste<br>→ week calendar</span>
         </div>
@@ -468,7 +476,11 @@
         </div>
         <div class="arch-box" style="background:#0f1117">
           <span class="blue">💬 Coach</span><br>
-          <span class="muted" style="font-size:0.72rem">streaming chat<br>AI responses</span>
+          <span class="muted" style="font-size:0.72rem">holistic chat<br>+ plans</span>
+        </div>
+        <div class="arch-box" style="background:#0f1117">
+          <span class="blue">🍽️ Food</span><br>
+          <span class="muted" style="font-size:0.72rem">log by text/photo<br>daily macros</span>
         </div>
       </div>
     </div>
@@ -484,10 +496,16 @@
         <div class="arch-box" style="background:#0f1117"><span class="green">plans.py</span><br><span class="muted" style="font-size:0.72rem">/plans/generate</span></div>
         <div class="arch-box" style="background:#0f1117"><span class="green">chat.py</span><br><span class="muted" style="font-size:0.72rem">/chat (streaming)</span></div>
       </div>
+      <div class="arch-row">
+        <div class="arch-box" style="background:#0f1117"><span class="green">nutrition.py</span><br><span class="muted" style="font-size:0.72rem">/food agent + log</span></div>
+        <div class="arch-box" style="background:#0f1117"><span class="green">coach.py</span><br><span class="muted" style="font-size:0.72rem">holistic tools</span></div>
+        <div class="arch-box" style="background:#0f1117"><span class="green">calories_importer</span><br><span class="muted" style="font-size:0.72rem">table scrape</span></div>
+        <div class="arch-box" style="background:#0f1117"><span class="green">sleep_importer</span><br><span class="muted" style="font-size:0.72rem">Greek parsers</span></div>
+      </div>
       <div class="arch-row" style="margin-top:0.5rem">
         <div class="arch-box" style="background:#0f1117; flex:2"><span class="orange">db.py</span> — all database functions (connection pool, upsert, queries)</div>
         <div class="arch-box" style="background:#0f1117; flex:2"><span class="orange">csv_importer.py</span> — multi-locale Garmin CSV parser</div>
-        <div class="arch-box" style="background:#0f1117; flex:2"><span class="orange">garmin_playwright.py</span> — browser automation sync</div>
+        <div class="arch-box" style="background:#0f1117; flex:2"><span class="orange">garmin_playwright.py</span> — browser automation (activities · sleep · calories)</div>
       </div>
     </div>
 
@@ -497,17 +515,17 @@
     <div class="arch-row">
       <div class="arch-box" style="flex:2">
         <div class="arch-title">PostgreSQL Database</div>
-        <span class="green">activities</span> <span class="muted" style="font-size:0.72rem">(running + cycling)</span> &nbsp;|&nbsp; <span class="green">goals</span> &nbsp;|&nbsp; <span class="green">weekly_plans</span>
+        <span class="green">activities</span> &nbsp;|&nbsp; <span class="green">sleep_weeks/nights</span> &nbsp;|&nbsp; <span class="green">calories</span> &nbsp;|&nbsp; <span class="green">foods</span> &nbsp;|&nbsp; <span class="green">food_log</span> &nbsp;|&nbsp; <span class="green">goals</span> &nbsp;|&nbsp; <span class="green">weekly_plans</span>
       </div>
       <div class="arch-box" style="flex:1">
         <div class="arch-title">Anthropic Claude API</div>
         <span class="purple">claude-opus-4-7</span><br>
-        <span class="muted" style="font-size:0.72rem">plans · chat</span>
+        <span class="muted" style="font-size:0.72rem">coach · nutrition · plans · vision</span>
       </div>
       <div class="arch-box" style="flex:1">
         <div class="arch-title">Garmin Connect</div>
         <span class="red">Playwright Chrome</span><br>
-        <span class="muted" style="font-size:0.72rem">CSV export automation</span>
+        <span class="muted" style="font-size:0.72rem">CSV export + table scrape</span>
       </div>
     </div>
   </div>
@@ -602,7 +620,7 @@ _pool = <span class="cl">ConnectionPool</span>(
     max_size=<span class="nm">10</span>
 )</pre>
 
-  <h3>The three tables</h3>
+  <h3>The tables</h3>
 
   <div class="code-label">SQL schema (simplified)</div>
   <pre><span class="cm">-- Every run AND ride you have ever recorded — one table, one discriminator.</span>
@@ -638,7 +656,31 @@ _pool = <span class="cl">ConnectionPool</span>(
 
 <span class="cm">-- Sleep lives in its own tables (it is not an activity). See §12.</span>
 <span class="kw">CREATE TABLE</span> <span class="cl">sleep_weeks</span>  ( week_start  TEXT <span class="kw">PRIMARY KEY</span>, ... );  <span class="cm">-- weekly averages</span>
-<span class="kw">CREATE TABLE</span> <span class="cl">sleep_nights</span> ( night_date  TEXT <span class="kw">PRIMARY KEY</span>, ... );  <span class="cm">-- per-night detail</span></pre>
+<span class="kw">CREATE TABLE</span> <span class="cl">sleep_nights</span> ( night_date  TEXT <span class="kw">PRIMARY KEY</span>, ... );  <span class="cm">-- per-night detail</span>
+
+<span class="cm">-- Calories BURNED, scraped per day from Garmin (resting + active). See §13.</span>
+<span class="kw">CREATE TABLE</span> <span class="cl">calories</span> (
+    day_date     TEXT <span class="kw">PRIMARY KEY</span>,  <span class="cm">-- one row per day; re-scrape overwrites</span>
+    resting_cal  INTEGER,
+    activity_cal INTEGER,
+    total_cal    INTEGER
+);
+
+<span class="cm">-- Food eaten — the nutrition agent's library + log. See §13.</span>
+<span class="kw">CREATE TABLE</span> <span class="cl">foods</span> (         <span class="cm">-- reusable per-100g library</span>
+    name             TEXT <span class="kw">PRIMARY KEY</span>,  <span class="cm">-- lowercased</span>
+    kcal_per_100g    NUMERIC,
+    protein_per_100g NUMERIC,
+    fat_per_100g     NUMERIC,
+    carbs_per_100g   NUMERIC
+);
+<span class="kw">CREATE TABLE</span> <span class="cl">food_log</span> (      <span class="cm">-- one row per portion eaten</span>
+    id        BIGINT <span class="kw">PRIMARY KEY</span>,
+    log_date  TEXT,                  <span class="cm">-- the day eaten (may be backdated)</span>
+    food_name TEXT,
+    grams     NUMERIC,
+    kcal      NUMERIC, protein_g NUMERIC, fat_g NUMERIC, carbs_g NUMERIC
+);  <span class="cm">-- daily totals = SUM(...) grouped by log_date → the four numbers</span></pre>
 
   <h3>Deduplication — the most important design decision</h3>
   <p>
@@ -878,8 +920,11 @@ context.<span class="fn">add_init_script</span>(
   </div>
 
   <p>
-    We use the <strong>Anthropic Python SDK</strong> to call Claude in two distinct ways:
-    streaming chat for the coaching conversation, and structured JSON generation for weekly plans.
+    We use the <strong>Anthropic Python SDK</strong> to call Claude in several distinct ways:
+    streaming chat for the coaching conversation, structured JSON generation for weekly plans,
+    and <strong>two tool-use agents</strong> — the holistic coach and a separate nutrition agent
+    (§13) — that call functions to read and write the local database instead of holding all the
+    data in the prompt.
   </p>
 
   <h3>Streaming chat</h3>
@@ -907,6 +952,37 @@ Their personal records: {personal_records}"""</span>,
       <strong>Context injection:</strong> Before calling Claude, we fetch your real activity data from
       the database and embed it in the system prompt. Claude is not guessing — it is reasoning
       about your actual 873 runs, your specific goals, and your real personal records.
+    </div>
+  </div>
+
+  <h3>The holistic coach — a tool-use agent</h3>
+  <p>
+    The coach is no longer running-only. It is a <strong>tool-use agent</strong>: rather than
+    dumping every metric into the prompt, Claude is given a set of tools and decides which to call.
+    This lets it pull only the data a given question needs, and reason across <em>all</em> of your
+    training signals at once.
+  </p>
+  <div class="code-label">backend/coach.py — the coach's tools</div>
+  <pre>get_recent_activities   <span class="cm"># runs: distance, pace, HR, VO2max</span>
+get_recent_cycling      <span class="cm"># rides: distance, speed, HR</span>
+get_recent_sleep        <span class="cm"># nightly duration, stages, HRV</span>
+get_recent_calories     <span class="cm"># energy BURNED (resting + active)</span>
+get_recent_nutrition    <span class="cm"># energy EATEN (the four daily totals)</span>
+get_goals               <span class="cm"># race targets + training goals</span>
+get_pr_progression      <span class="cm"># personal-record history</span></pre>
+  <p>
+    With cycling, sleep, calories-burned and food-intake all on tap, the coach reasons about
+    <strong>energy balance</strong> (eaten vs. burned), recovery (sleep + HRV before hard days), and
+    cross-training load — not just the last few runs.
+  </p>
+
+  <div class="callout green">
+    <span class="callout-icon">📝</span>
+    <div>
+      <strong>coach_persona.md</strong> — a plain-English file you can edit. Its contents are loaded
+      (<code>load_persona()</code>) and injected into the coach's system prompt, so you steer the
+      coach's priorities (e.g. "running is the focus; weigh cycling and sleep as supporting context")
+      in words, without touching code.
     </div>
   </div>
 
@@ -1129,15 +1205,21 @@ Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">7 col
 │ &nbsp;&nbsp;├── <span class="file">config.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># loads .env, exposes DATABASE_URL, API keys, paths</span><br>
 │ &nbsp;&nbsp;├── <span class="file">db.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># ALL database functions: schema, upsert, queries</span><br>
 │ &nbsp;&nbsp;├── <span class="file">csv_importer.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># multi-locale Garmin CSV parser + importer</span><br>
-│ &nbsp;&nbsp;├── <span class="file">garmin_playwright.py</span> &nbsp; <span class="note"># browser automation: activities + sleep export</span><br>
+│ &nbsp;&nbsp;├── <span class="file">garmin_playwright.py</span> &nbsp; <span class="note"># browser automation: activities + sleep + calories</span><br>
 │ &nbsp;&nbsp;├── <span class="file">sleep_importer.py</span> &nbsp;&nbsp;&nbsp; <span class="note"># parses weekly + 1-day Greek sleep CSVs</span><br>
+│ &nbsp;&nbsp;├── <span class="file">calories_importer.py</span> &nbsp; <span class="note"># parses the scraped calories-burned table</span><br>
+│ &nbsp;&nbsp;├── <span class="file">greek_dates.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># shared Greek month/date parsing helpers</span><br>
+│ &nbsp;&nbsp;├── <span class="file">coach.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># holistic coach: tool-use agent + persona loader</span><br>
+│ &nbsp;&nbsp;├── <span class="file">nutrition.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># nutrition agent: food library + log tools + vision</span><br>
 │ &nbsp;&nbsp;├── <span class="file">sync.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># legacy API sync (kept but unused)</span><br>
 │ &nbsp;&nbsp;└── <span class="dir">routes/</span><br>
 │ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">activities.py</span> &nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /sync (both) /sync/running /import/csv</span><br>
-│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">stats.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /stats/* running + /stats/cycling/* + aerobic eff.</span><br>
+│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">stats.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /stats/* running + cycling + sleep + calories + nutrition</span><br>
 │ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">plans.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /plans/* — AI generate + paste→calendar parse</span><br>
 │ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">goals.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /goals/* — CRUD for race targets</span><br>
+│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">nutrition.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /food — agent chat (text+photo) + today's totals</span><br>
 │ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="file">chat.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /chat — streaming AI coaching conversation</span><br>
+├── <span class="file">coach_persona.md</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># plain-English coach preferences (edit to steer it)</span><br>
 ├── <span class="dir">frontend/</span><br>
 │ &nbsp;&nbsp;└── <span class="file">index.html</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># entire UI — all CSS, HTML, JS in one file</span><br>
 ├── <span class="dir">scripts/</span><br>
@@ -1195,7 +1277,12 @@ Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">7 col
     <tr>
       <td><strong>Claude API</strong></td>
       <td>AI engine</td>
-      <td>Best reasoning for coaching context; streaming API makes chat feel live; structured JSON output for plan generation is reliable</td>
+      <td>Best reasoning for coaching context; streaming API makes chat feel live; tool-use lets the coach &amp; nutrition agents query the DB; vision reads food photos; structured JSON output for plans is reliable</td>
+    </tr>
+    <tr>
+      <td><strong>Pillow</strong></td>
+      <td>Image processing</td>
+      <td>Downscales uploaded food photos to Anthropic's recommended ≤1568px and re-encodes JPEG before base64 — smaller payloads, faster vision calls</td>
     </tr>
     <tr>
       <td><strong>Single HTML file</strong></td>
@@ -1293,6 +1380,102 @@ Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">7 col
     described above. The weekly backdrop is a periodic snapshot; re-running the 1-year export
     refreshes it.
   </p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     13 — CALORIES & THE NUTRITION AGENT
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num purple">13</div>
+    <h2>Calories &amp; the Nutrition Agent</h2>
+  </div>
+
+  <p>
+    The app tracks energy on <strong>both</strong> sides of the ledger: calories <em>burned</em>
+    (pulled from Garmin) and calories <em>eaten</em> (logged by you through an AI agent). Together
+    they let the coach reason about energy balance.
+  </p>
+
+  <h3>Calories burned — scraping a table, not a CSV</h3>
+  <p>
+    Garmin's calories page offers <strong>no export</strong> — there is no ⋮ menu, only a clean
+    on-page <code>&lt;table&gt;</code>. So the scraper selects the 7-day view and reads the table
+    directly from the DOM (matching the <code>Ημερομηνία</code> / date header), then
+    <code>calories_importer.py</code> parses each row — Greek month names and comma decimals
+    handled by the shared <code>greek_dates.py</code> helpers.
+  </p>
+  <div class="code-label">backend/calories_importer.py — overwrite-by-day import</div>
+  <pre><span class="cm"># One row per day. Re-scraping the same date simply overwrites it,</span>
+<span class="cm"># so the table always holds the latest Garmin figure for each day.</span>
+<span class="kw">INSERT INTO</span> calories (day_date, resting_cal, activity_cal, total_cal)
+<span class="kw">VALUES</span> (...)
+<span class="kw">ON CONFLICT</span> (day_date) <span class="kw">DO UPDATE SET</span> ...
+<span class="cm"># returns {new, updated, skipped} so the UI can report what changed</span></pre>
+  <p>
+    The <strong>🔥 Calories</strong> tab renders a stacked bar per day — resting (base metabolism)
+    plus active (movement) — so the total and its split are visible at a glance.
+  </p>
+
+  <h3>Calories eaten — the nutrition agent</h3>
+  <p>
+    A <strong>second, separate</strong> Claude tool-use agent (<code>nutrition.py</code>, its own
+    <code>food</code> chat channel) lets you log what you ate in plain language — by text or by
+    photo. The whole point: reduce each day to <strong>four numbers</strong> — calories, protein,
+    fat, carbs — stored as daily totals.
+  </p>
+
+  <div class="callout blue">
+    <span class="callout-icon">🍽️</span>
+    <div>
+      <strong>Two tables, four numbers.</strong> A reusable <code>foods</code> library holds each
+      food's per-100g nutrition; <code>food_log</code> holds one row per portion you actually ate.
+      The four daily totals are just <code>SUM()</code> over <code>food_log</code> grouped by day —
+      computed, never hand-maintained.
+    </div>
+  </div>
+
+  <h3>How a logging turn works</h3>
+  <div class="file-tree">
+You: <span style="color:#7ad9a4">"200g chicken breast and 150g rice"</span><br>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> <span class="fn">find_food</span>("chicken breast")<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">·</span> known? → <span class="fn">log_food</span>(name, grams) → computes macros for the portion<br>
+&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">·</span> unknown? → agent estimates per-100g, <em>asks you to confirm</em>,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;then <span class="fn">add_food</span>(…) once → <span class="fn">log_food</span>(…)<br>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> stores in <span class="cl">food_log</span>, returns the updated day total<br>
+Agent <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">"Logged. Today: 612 kcal · P 78g · F 9g · C 51g"</span>
+  </div>
+  <p>
+    The agent always converts portions to <strong>grams</strong> (estimating and stating its
+    assumption for vague amounts like "2 eggs"), and an unknown food is only saved to the library
+    <em>after you confirm the figures</em> — so the library stays trustworthy.
+  </p>
+
+  <h3>Photos &amp; backdating</h3>
+  <ul>
+    <li><strong>Photos:</strong> attach a food photo and Claude <strong>vision</strong> identifies the
+      foods and estimates portions. <code>Pillow</code> downscales the image to ≤1568px JPEG before
+      it's base64-encoded into the request.</li>
+    <li><strong>Past days:</strong> say "yesterday" or "on Monday" and the agent resolves it to a
+      <code>YYYY-MM-DD</code> date and logs against that day instead of today.</li>
+  </ul>
+
+  <h3>The Food tab</h3>
+  <p>
+    A totals bar shows today's four numbers (refreshed out-of-band after every message), above a
+    <strong>daily-macros bar chart</strong> — one stacked bar per day with grams labelled inside
+    each segment (protein on top, carbs in the middle, fat at the bottom) and total calories printed
+    on top — and the agent chat itself below.
+  </p>
+
+  <div class="callout green">
+    <span class="callout-icon">🔗</span>
+    <div>
+      <strong>Closing the loop:</strong> both sides feed the coach. <code>get_recent_calories</code>
+      (burned) and <code>get_recent_nutrition</code> (eaten) are coach tools, so a single question
+      like "am I eating enough for this training block?" is answered against real numbers.
+    </div>
+  </div>
 </div>
 
 <!-- footer -->
