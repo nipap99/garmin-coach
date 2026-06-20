@@ -40,11 +40,16 @@ If the user sends a PHOTO of food:
 - Identify each food in the image and estimate its portion in grams from visual cues (plate size, typical servings). State your gram estimates and that they're approximate.
 - Then proceed exactly as above (find_food / add_food / log_food). If you're unsure what a food is, ask before logging.
 
+Dates — the user may log food for a PAST day:
+- If they mention a day ("yesterday", "on Monday", "June 15", "2 days ago"), resolve it to a YYYY-MM-DD date using today's date (given in the message) and pass it as the `date` argument to log_food (and get_day_total).
+- If no day is mentioned, log against today (omit `date`).
+- When confirming, state which day you logged to if it isn't today.
+
 Rules:
 - Always log in grams; be explicit about the gram amount you used.
 - Use the user's exact figures when they give them; otherwise estimate and clearly label it an estimate.
 - Be concise — a line or two per food, then the daily total.
-- Today's date is provided in the user's message; log against it."""
+- Today's date is provided in the user's message."""
 
 
 TOOLS: list[dict[str, Any]] = [
@@ -80,14 +85,23 @@ TOOLS: list[dict[str, Any]] = [
             "properties": {
                 "food_name": {"type": "string"},
                 "grams": {"type": "number", "description": "Portion size in grams."},
+                "date": {
+                    "type": "string",
+                    "description": "Day eaten as YYYY-MM-DD. Omit for today. Use this to log a past day the user refers to (e.g. 'yesterday').",
+                },
             },
             "required": ["food_name", "grams"],
         },
     },
     {
         "name": "get_day_total",
-        "description": "Get today's running macro total and the list of items logged so far (with their ids).",
-        "input_schema": {"type": "object", "properties": {}},
+        "description": "Get a day's running macro total and the list of items logged (with their ids). Defaults to today; pass a date to check a past day.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "date": {"type": "string", "description": "Day as YYYY-MM-DD. Omit for today."},
+            },
+        },
     },
     {
         "name": "remove_log_entry",
@@ -99,6 +113,17 @@ TOOLS: list[dict[str, Any]] = [
         },
     },
 ]
+
+
+def _resolve_date(args: dict[str, Any]) -> str:
+    """Use the agent-supplied YYYY-MM-DD date if valid, else today."""
+    d = (args.get("date") or "").strip()
+    if d:
+        try:
+            return date.fromisoformat(d).isoformat()
+        except ValueError:
+            pass
+    return date.today().isoformat()
 
 
 def _run_tool(name: str, args: dict[str, Any]) -> str:
@@ -122,6 +147,7 @@ def _run_tool(name: str, args: dict[str, Any]) -> str:
         food = db.find_food(args["food_name"])
         if not food:
             return json.dumps({"error": f"'{args['food_name']}' is not in the library — add_food first."})
+        log_date = _resolve_date(args)
         grams = float(args["grams"])
         k = grams / 100.0
         entry = {
@@ -130,18 +156,19 @@ def _run_tool(name: str, args: dict[str, Any]) -> str:
             "fat_g":     round((food["fat_per_100g"] or 0) * k, 1),
             "carbs_g":   round((food["carbs_per_100g"] or 0) * k, 1),
         }
-        db.add_food_log(today, food["name"], grams,
+        db.add_food_log(log_date, food["name"], grams,
                         entry["kcal"], entry["protein_g"], entry["fat_g"], entry["carbs_g"])
         return json.dumps({
-            "logged": {"food": food["name"], "grams": grams, **entry},
-            "day_total": db.get_nutrition_day(today),
+            "logged": {"food": food["name"], "grams": grams, "date": log_date, **entry},
+            "day_total": db.get_nutrition_day(log_date),
         }, default=str)
 
     if name == "get_day_total":
+        d = _resolve_date(args)
         return json.dumps({
-            "date": today,
-            "total": db.get_nutrition_day(today),
-            "items": db.get_food_log(today),
+            "date": d,
+            "total": db.get_nutrition_day(d),
+            "items": db.get_food_log(d),
         }, default=str)
 
     if name == "remove_log_entry":
