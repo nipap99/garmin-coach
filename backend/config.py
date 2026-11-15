@@ -23,7 +23,6 @@ def _resolve(path_str: str) -> Path:
 
 GARMIN_EMAIL: str = os.environ.get("GARMIN_EMAIL", "")
 GARMIN_PASSWORD: str = os.environ.get("GARMIN_PASSWORD", "")
-ANTHROPIC_API_KEY: str = os.environ.get("ANTHROPIC_API_KEY", "")
 
 GARMIN_TOKEN_DIR: Path = _resolve(os.environ.get("GARMIN_TOKEN_DIR", "./data/garmin_tokens"))
 
@@ -36,7 +35,4 @@ DATABASE_URL: str = os.environ.get(
     "postgresql://coach:coach_local_dev@localhost:5432/garmin_coach",
 )
 
-# Legacy SQLite path — kept only so the one-time migration script can read the
-# old data out of it. The app no longer uses SQLite at runtime.
-DATABASE_PATH: Path = _resolve(os.environ.get("DATABASE_PATH", "./data/coach.db"))
 DATA_DIR: Path = PROJECT_ROOT / "data"

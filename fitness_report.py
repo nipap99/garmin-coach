@@ -1,9 +1,9 @@
-"""Complete weekly Fitness Report -> multi-page PDF in Downloads.
+"""Complete weekly Fitness Report -> multi-page PDF in the Fitness Report folder (OUTPUT_DIR).
 
 APEX edition — a dark, performance-styled report. Five pages, each built from
 the local garmin-coach database with the same infographics as the app:
   1. Overview      — KPI tiles, race countdown, 8-week load, HRV recovery, verdict
-  2. Weekly Review — recovery, nutrition, running progression (efficiency trend)
+  2. Weekly Review — plan vs actual, recovery, nutrition, running progression
   3. This week     — the detailed Mon-Sat plan (warm-up / main / cool-down + gates)
   4. Sleep         — score + stage breakdown, HRV / resting HR, with feedback
   5. Nutrition     — calories burned vs eaten, energy balance, avg macros, feedback
@@ -16,7 +16,11 @@ Visual identity (APEX): near-black canvas, one signal-orange accent, cyan for
 positive movement and amber for "watch"; condensed IBM Plex for display/data.
 Fonts are bundled in assets/fonts (IBM Plex — Greek supported).
 
-Weeks run Monday-Saturday. Manual run:
+Weeks run Monday-Saturday. After writing the PDF, the week's plan_days are saved
+to the weekly_plans table so the dashboard's Today card and next week's
+plan-vs-actual check can read them. Test render elsewhere (no plan save):
+    .venv\Scripts\python.exe fitness_report.py --out <folder>
+Manual run:
     .venv\\Scripts\\python.exe fitness_report.py
 """
 from __future__ import annotations
@@ -32,7 +36,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fpdf import FPDF
 
-from backend import db, training_load
+from backend import db, metrics, training_load
 
 ROOT = Path(os.path.dirname(os.path.abspath(__file__)))
 AI_PATH = ROOT / "data" / "report_ai.json"
@@ -42,6 +46,7 @@ LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s",
                     handlers=[logging.FileHandler(LOG_PATH, encoding="utf-8"), logging.StreamHandler()])
 logger = logging.getLogger("fitness_report")
+logging.getLogger("fontTools").setLevel(logging.ERROR)   # silence "MERG NOT subset" noise
 
 # Report output folder — moved from Downloads to a dedicated Desktop folder (2026-11-14).
 OUTPUT_DIR = Path(r"C:\Users\papad\Desktop\Fitness Report")
@@ -536,7 +541,10 @@ def gather():
              if g.get("target_date") and g["target_date"] >= today.isoformat()]
     goals.sort(key=lambda g: g["target_date"])
 
+    week = metrics.week_summary(rev_start.isoformat())
+
     return {"today": today, "rev_start": rev_start, "rev_end": rev_end, "plan_start": plan_start,
+            "week": week,
             "week_runs": week_runs, "load": load, "week_sleep": week_sleep,
             "week_cals": week_cals, "week_nutr": week_nutr,
             "goal": goals[0] if goals else None, "goals": goals, "all_runs": all_runs}
@@ -631,11 +639,56 @@ def page_overview(pdf, d, ai):
     _para(pdf, ai.get("overall_verdict") or _fallback_verdict(d, a, net), size=9.4, color=TEXT)
 
 
+def _plan_vs_actual(pdf, wk, CW):
+    """Planned vs done, one row per day, from metrics.week_summary()."""
+    days = wk.get("days") or []
+    if not days:
+        return
+    _eyebrow(pdf, "00 · Plan vs actual")
+    x0, y = pdf.l_margin, pdf.get_y()
+    rh = 5.2
+    _card(pdf, x0, y, CW, rh * len(days) + 7, fill=PANEL)
+    cols = (x0 + 4, x0 + 18, x0 + 62)
+    pdf.set_font(pdf.mono, "", 5.8); pdf.set_text_color(*FAINT)
+    pdf.set_xy(cols[0], y + 1.5); pdf.cell(14, 3.5, "DAY")
+    pdf.set_xy(cols[1], y + 1.5); pdf.cell(44, 3.5, "PLANNED")
+    pdf.set_xy(cols[2], y + 1.5); pdf.cell(100, 3.5, "DONE")
+    yy = y + 6
+    for dd in days:
+        ok = dd.get("matches_plan")
+        mark, col = ("OK", CYAN) if ok else (("MISS", WARN) if ok is False else ("", FAINT))
+        sess = dd.get("sessions") or []
+        if sess:
+            main = max(sess, key=lambda s: (s["hard"], s["km"]))
+            done = f"{main['type']} {sum(s['km'] for s in sess):.1f} km"
+            if main.get("work"):
+                done += f" - {main['work']}"
+        else:
+            done = "rest"
+        pdf.set_font(pdf.mono, "B", 6.6); pdf.set_text_color(*TEXT)
+        pdf.set_xy(cols[0], yy); pdf.cell(14, rh, dd["weekday"].upper())
+        pdf.set_font(pdf.mono, "", 6.6); pdf.set_text_color(*MUTED)
+        pdf.set_xy(cols[1], yy); pdf.cell(44, rh, dd["planned"]["type"])
+        pdf.set_text_color(*TEXT)
+        pdf.set_xy(cols[2], yy); pdf.cell(CW - 62 - 20, rh, done[:95])
+        pdf.set_font(pdf.mono, "B", 6.6); pdf.set_text_color(*col)
+        pdf.set_xy(x0 + CW - 18, yy); pdf.cell(14, rh, mark, align="R")
+        yy += rh
+    pdf.set_y(y + rh * len(days) + 9)
+    summary = (f"{wk.get('running_km', 0)} km - hard days: {', '.join(wk.get('hard_days') or []) or 'none'}"
+               f" - adherence {wk.get('plan_adherence') or '-'} (plan: {wk.get('plan_source')})")
+    flags = wk.get("flags") or []
+    _para(pdf, summary + (" - FLAGS: " + "; ".join(flags) if flags else ""), size=8.4)
+    pdf.ln(1.5)
+
+
 def page_review(pdf, d, ai):
     _page_header(pdf, "Weekly Review",
                  f"{d['rev_start']:%d %b} – {d['rev_end']:%d %b}: recovery · nutrition · progression")
     CW = pdf.w - pdf.l_margin - pdf.r_margin
     sl = d["week_sleep"]
+
+    _plan_vs_actual(pdf, d.get("week") or {}, CW)
 
     _eyebrow(pdf, "01 · Recovery")
     hrvs = [_f(s.get("hrv_ms")) for s in sl if s.get("hrv_ms")]
@@ -867,9 +920,28 @@ def _fallback_plan(d):
     return out
 
 
+def _save_plan(ai, d):
+    """Store this week's plan so the Today card + next week's review can use it."""
+    days = ai.get("plan_days") or []
+    if not days:
+        return
+    week_start = ai.get("plan_week_start") or d["plan_start"].isoformat()
+    for p in db.list_weekly_plans(limit=50):
+        pj = p.get("plan_json") or {}
+        if p.get("week_start") == week_start and pj.get("source") == "weekly-report":
+            db.update_plan_status(p["id"], "archived")
+    pid = db.create_weekly_plan(week_start, {"source": "weekly-report", "focus": ai.get("plan_focus"),
+                                             "days": days})
+    db.update_plan_status(pid, "accepted")
+    logger.info("Saved plan for week of %s (weekly_plans id %s)", week_start, pid)
+
+
 def main():
+    out_dir, save = OUTPUT_DIR, True
+    if "--out" in sys.argv:
+        out_dir, save = Path(sys.argv[sys.argv.index("--out") + 1]), False
     try:
-        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        out_dir.mkdir(parents=True, exist_ok=True)
         d = gather(); ai = load_ai()
         _validate_ai(ai)
         pdf = ReportPDF()
@@ -882,9 +954,11 @@ def main():
             pdf.add_page()
             builder(pdf, d, ai)
         _check_pages(pdf, len(builders))
-        out = OUTPUT_DIR / f"fitness report - week of {d['rev_start']:%Y-%m-%d}.pdf"
+        out = out_dir / f"fitness report - week of {d['rev_start']:%Y-%m-%d}.pdf"
         pdf.output(str(out))
         logger.info("Wrote fitness report -> %s (%d pages)", out, pdf.pages_count)
+        if save:
+            _save_plan(ai, d)
         print(out)
         return 0
     except Exception:

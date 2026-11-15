@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Query
 
-from .. import db, training_load as training_load_mod
+from .. import db, metrics, training_load as training_load_mod
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
@@ -253,41 +253,30 @@ def nutrition_trend(days: int = Query(14, ge=3, le=120)):
 
 
 def _plan_today(today_iso: str, weekday_name: str) -> dict:
-    """Find today's session in the active (or most recent) weekly plan."""
-    plans = db.list_weekly_plans()
-    if not plans:
+    """Today's session from the plan the Sunday report saved (weekly_plans,
+    source "weekly-report"), else the agreed template day."""
+    today_d = date.fromisoformat(today_iso)
+    source, plan = metrics.planned_days(metrics.monday(today_d))
+    day = plan.get(today_d.weekday())
+    if not day:
         return {"has": False}
-    accepted = [p for p in plans if p.get("status") == "accepted"]
-    chosen = accepted[0] if accepted else plans[0]
-
-    pj = chosen.get("plan_json")
-    if isinstance(pj, str):
-        try:
-            pj = json.loads(pj)
-        except Exception:
-            pj = {}
-    days = (pj or {}).get("days", []) or []
-
-    day = next((d for d in days if (d.get("date") or "") == today_iso), None)
-    if day is None:
-        day = next(
-            (d for d in days if (d.get("day") or "").lower() == weekday_name.lower()),
-            None,
-        )
-    if day is None:
-        return {"has": False}
-
-    wtype = (day.get("workout_type") or "easy").lower()
-    dist = float(day.get("distance_km") or 0)
-    dur = int(day.get("duration_min") or 0)
+    full = {}
+    if source == "weekly report":
+        for p in db.list_weekly_plans(limit=50):
+            pj = p.get("plan_json") or {}
+            if pj.get("source") == "weekly-report":
+                full = next((d for d in pj.get("days", []) if d.get("date") == today_iso), {})
+                if full:
+                    break
+    wtype = day["type"]
     return {
         "has": True,
-        "accepted": bool(accepted),
+        "source": source,
         "workout_type": wtype,
-        "title": day.get("title") or "",
-        "distance_km": round(dist, 1),
-        "duration_min": dur,
-        "is_rest": wtype == "rest" or (dist == 0 and dur == 0),
+        "title": day.get("title") or wtype.capitalize(),
+        "target": full.get("target") or "",
+        "main": full.get("main") or "",
+        "is_rest": wtype == "rest",
     }
 
 
@@ -310,6 +299,9 @@ def today_overview():
             "resting_hr": int(night["resting_hr"]) if night.get("resting_hr") is not None else None,
             "night_date": night.get("night_date"),
         }
+        light = metrics.readiness()
+        readiness.update({"light": light.get("light"), "light_reason": light.get("reason"),
+                          "light_advice": light.get("advice")})
     else:
         readiness = {"has": False}
 

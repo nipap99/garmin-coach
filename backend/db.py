@@ -232,18 +232,17 @@ def get_connection():
 
 
 def _week_start(d: date) -> date:
-    """The Sunday that begins the week containing ``d``.
+    """The Monday that begins the week containing ``d``.
 
-    The Garmin watch starts the training week on Sunday, so every weekly total
-    and bucket in the app matches that. (Python's ``weekday()`` has Monday = 0,
-    hence the ``+ 1``: Sunday → 0 days back, Monday → 1, … Saturday → 6.)
+    The athlete trains Mon–Sat with Sunday as rest, so every weekly total and
+    bucket in the app uses Monday-start weeks (changed from Sunday 2026-11-15,
+    to match the weekly report and the coaches).
     """
-    return d - timedelta(days=(d.weekday() + 1) % 7)
+    return d - timedelta(days=d.weekday())
 
 
-# Postgres expression: the Sunday that begins the week of a date column.
-# Shift the date +1 day, truncate to the ISO (Monday) week, then step back 1 day.
-_SUNDAY_WEEK = "DATE_TRUNC('week', start_local::date + INTERVAL '1 day') - INTERVAL '1 day'"
+# Postgres expression: the Monday that begins the week of a date column (ISO week).
+_MONDAY_WEEK = "DATE_TRUNC('week', start_local::date)"
 
 
 # ----------------------------- Activities ----------------------------------
@@ -506,13 +505,13 @@ def get_weekly_mileage(weeks: int = 16) -> list[dict[str, Any]]:
         rows = conn.execute(
             f"""
             SELECT
-                TO_CHAR({_SUNDAY_WEEK}, 'YYYY-MM-DD') AS week_start,
+                TO_CHAR({_MONDAY_WEEK}, 'YYYY-MM-DD') AS week_start,
                 ROUND(SUM(distance_km)::numeric, 1)   AS total_km,
                 COUNT(*)                              AS run_count
             FROM activities
             WHERE start_local >= %s AND distance_km > 0
               AND activity_type = 'running'
-            GROUP BY {_SUNDAY_WEEK}
+            GROUP BY {_MONDAY_WEEK}
             ORDER BY week_start ASC
             """,
             (cutoff,),
@@ -633,13 +632,13 @@ def get_cycling_weekly_distance(weeks: int = 16) -> list[dict[str, Any]]:
         rows = conn.execute(
             f"""
             SELECT
-                TO_CHAR({_SUNDAY_WEEK}, 'YYYY-MM-DD') AS week_start,
+                TO_CHAR({_MONDAY_WEEK}, 'YYYY-MM-DD') AS week_start,
                 ROUND(SUM(distance_km)::numeric, 1)   AS total_km,
                 COUNT(*)                              AS ride_count
             FROM activities
             WHERE start_local >= %s AND distance_km > 0
               AND activity_type = 'cycling'
-            GROUP BY {_SUNDAY_WEEK}
+            GROUP BY {_MONDAY_WEEK}
             ORDER BY week_start ASC
             """,
             (cutoff,),

@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "garmin-coach": {
-      "command": "C:\\Users\\papad\\Desktop\\garmin-coach\\.venv\\Scripts\\python.exe",
-      "args": ["C:\\Users\\papad\\Desktop\\garmin-coach\\mcp_coach.py"]
-    }
-  }
-}

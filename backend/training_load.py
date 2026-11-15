@@ -18,9 +18,12 @@ from typing import Any
 from . import db
 
 
-def _sunday(d: datetime) -> str:
-    """Sunday (YYYY-MM-DD) that begins the week of a datetime — matches db._week_start."""
-    return (d - timedelta(days=(d.weekday() + 1) % 7)).strftime("%Y-%m-%d")
+def _monday(d: datetime) -> str:
+    """Monday (YYYY-MM-DD) that begins the week of a datetime — matches db._week_start.
+
+    The athlete's week is Mon–Sat running + Sunday rest, so weeks start Monday
+    (changed from Sunday on 2026-11-15)."""
+    return (d - timedelta(days=d.weekday())).strftime("%Y-%m-%d")
 
 
 def compute(weeks: int = 14, sport: str | None = None) -> dict[str, Any]:
@@ -61,10 +64,10 @@ def compute(weeks: int = 14, sport: str | None = None) -> dict[str, Any]:
         key = "run" if s["activity_type"] == "running" else "ride"
         daily[day][key] += trimp(float(s["duration_min"]), float(s["avg_hr"]))
 
-    # ── weekly load (Sunday weeks) ────────────────────────────────────────
+    # ── weekly load (Monday weeks) ────────────────────────────────────────
     weekly: dict[str, dict[str, float]] = defaultdict(lambda: {"run": 0.0, "ride": 0.0})
     for day, v in daily.items():
-        wk = _sunday(datetime.fromisoformat(day))
+        wk = _monday(datetime.fromisoformat(day))
         weekly[wk]["run"] += v["run"]
         weekly[wk]["ride"] += v["ride"]
 
@@ -75,7 +78,7 @@ def compute(weeks: int = 14, sport: str | None = None) -> dict[str, Any]:
         nd = n.get("night_date")
         if not nd:
             continue
-        wk = _sunday(datetime.fromisoformat(nd))
+        wk = _monday(datetime.fromisoformat(nd))
         if n.get("hrv_ms"):
             wk_hrv[wk].append(n["hrv_ms"])
         if n.get("resting_hr"):
@@ -99,7 +102,7 @@ def compute(weeks: int = 14, sport: str | None = None) -> dict[str, Any]:
 
     # The week containing today is still accruing — flag it so the UI can show
     # it as "in progress" rather than as a sudden drop.
-    this_week = _sunday(datetime.now())
+    this_week = _monday(datetime.now())
 
     weeks_out = []
     for wk in ordered[-weeks:]:

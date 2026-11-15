@@ -1,0 +1,37 @@
+# Athlete notes for the week under review.
+# The Sunday report session reads this and factors it into the coaching read
+# (context the raw data cannot show — e.g. why a session was changed, illness,
+# travel, life load). Each note is tagged with the week it applies to; the
+# session uses ONLY the note whose week matches the review week and ignores the
+# rest, so stale notes expire on their own. Add a new dated block each week.
+
+[Week of 2026-10-26 to 2026-10-31]
+Saturday (31 Oct): Instead of the planned long run I did the ~8 km run as a TEMPO,
+not a long run. I spent all of Saturday helping a friend move house, so my body was
+already tired and I deliberately chose NOT to add more load. This was a conscious
+recovery / load-management decision — not a missed or failed session, and not a sign
+of lost fitness. Judge the week with that in mind (no "missing long run" shortfall),
+and simply put the long run back on Saturday next week.
+Saturday calories: forecast burn ~3016 kcal; I am deliberately NOT increasing intake
+to match (holding ~2,837 kcal), so a small deficit for Saturday is intentional - do
+NOT tell me to eat more for Saturday specifically. (The week-level note that protein
+has slipped still stands.)
+
+[Week of 2026-11-02 to 2026-11-07]
+Friday (6 Nov): the easy 5 km was run at ~3 degrees C (cold). HR was higher than usual
+for the pace (avg 155 at 5:54/km) - the athlete attributes this to the cold (body working
+to stay warm). Factor the cold in: do not read Friday's elevated HR as fatigue or lost
+fitness - sleep and HRV stayed excellent (HRV 95-100). (Cold start + vasoconstriction do
+nudge HR up; the run was also a touch brisk for an easy day, but it's a non-issue.)
+Saturday (7 Nov): this is the 5k BENCHMARK (parkrun) that replaced the long run this week.
+Read the parkrun result and use it to set a firm Nov 15 5k target; the long-run build
+resumes after the race.
+
+[Week of 2026-11-09 to 2026-11-14]
+Nov 15 is NOT a real race - it was a placeholder/self-test. So this week was CONVERTED
+from taper to BUILDING (the athlete wants to raise volume NOW). Do not treat Sunday Nov 15
+as a race or review it as one. What happened: Mon easy 6 km; Tue a sharp 3x1km @ 3:32 VO2
+session; Wed-Sat rebuilt as a ~55 km building week (easy volume + Thu threshold + Sat 18 km
+long run); Sun = normal rest. The Dec 20 half is ALSO a placeholder - no taper for it. The
+plan from here is a steady volume build toward 70-75 km/wk (Nov 16-22 continues it, ~58-60
+km), per the updated template.

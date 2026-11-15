@@ -1,0 +1,27 @@
+{
+  "description": "The athlete's track & speed workout library, with paces set from current fitness. The coach uses this to prescribe variety in track sessions. Rotate sessions week to week; pick 2 per week (3 only once recovery and fuelling are solid).",
+  "paces_intro": "Training paces from CURRENT fitness (recent 10k ~4:09/km, half ~4:16/km, VO2max 58). Goal paces (5k 3:34, HM 3:45) are faster — shift reps toward them as fitness sharpens.",
+  "paces": {
+    "5k": "3:55 /km (400m ~94s, 1km ~3:55)",
+    "10k": "4:10 /km (800m ~3:20, 1km ~4:10)",
+    "threshold": "4:18 /km (comfortably-hard, ~1hr effort)",
+    "half_marathon": "4:20 /km (1km ~4:20)",
+    "3k": "3:45 /km (faster than 5k)",
+    "marathon": "4:50 /km",
+    "zone4_hr": "170-183 bpm (max 204 / rest 45)"
+  },
+  "workouts": [
+    {"cat": "shorter", "name": "10 x 400m @ 5k pace", "detail": "~94s each (3:55/km), 90s walk recovery.", "note": "Classic 5k/VO2 session. Start at 8 reps if fatigued."},
+    {"cat": "shorter", "name": "6 x 4 min @ 10k pace", "detail": "~4:10/km (about 960m per rep), 2 min walk recovery.", "note": "Aerobic power by effort — forgiving on tired legs."},
+    {"cat": "longer", "name": "(800m @ 10k + 200m @ 5k) x 7", "detail": "~3:20 then ~47s, 2 min recovery between reps.", "note": "'Float' session — big aerobic stimulus, very race-specific."},
+    {"cat": "longer", "name": "5 x 120m @ 90% effort", "detail": "Hard but relaxed, walk back to recover.", "note": "Pure speed/strides — low stress, tack onto an easy day."},
+    {"cat": "longer", "name": "(800 / 400 / 200m @ Zone 4) x 2", "detail": "HR 170-183, 4 min rest between reps.", "note": "Descending ladder by heart rate — good when GPS pace is noisy."},
+    {"cat": "longer", "name": "(300 / 200 / 300m @ Zone 4) x 2", "detail": "100-200m jog float + 2 min rest; 5 min between sets.", "note": "Short, sharp Z4 reps with floats."},
+    {"cat": "longer", "name": "6-8 x 800-1200m @ 10k pace", "detail": "~3:20/800 to ~5:00/1200, short jog recovery.", "note": "Threshold-to-10k engine builder; grow reps over weeks."},
+    {"cat": "longer", "name": "4 x 1km @ 5k (2:30) + 2 x 800m faster (90s)", "detail": "1km ~3:55; close with 800s at ~3:00.", "note": "5k-specific with a finishing-speed kicker."},
+    {"cat": "longer", "name": "3 x 1km @ 5k (90s) + 2 x 1km @ 3k (2:30)", "detail": "~3:55 then ~3:45 for the last two.", "note": "Progressive — teaches a strong finish."},
+    {"cat": "longer", "name": "3 x 2km @ 5k pace (3 min)", "detail": "~7:50 per rep.", "note": "Demanding 5k-pace volume — a peak-sharpening session."},
+    {"cat": "longer", "name": "(3km @ HM + 1km @ Marathon) x 4", "detail": "~4:20 then ~4:50; continuous.", "note": "Long-run quality — can replace the long run as a 3rd hard day."},
+    {"cat": "longer", "name": "3k tempo + 2k threshold + 5x400 @ 5k + 5x200 hard", "detail": "~13:00 / ~8:36 (2 min) then 400s ~94s (60s) and 200s hard (30s).", "note": "Full mixed session — only when fresh and well-fuelled."}
+  ]
+}
