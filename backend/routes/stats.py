@@ -6,12 +6,13 @@ data to Chart.js.
 """
 from __future__ import annotations
 
+import json
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Query
 
-from .. import db
+from .. import db, training_load as training_load_mod
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
@@ -50,31 +51,6 @@ def weekly_mileage(weeks: int = Query(16, ge=4, le=52)):
         "labels": [r["week_start"] for r in rows],
         "values": [float(r["total_km"]) for r in rows],
         "counts": [int(r["run_count"]) for r in rows],
-    }
-
-
-@router.get("/pace-trend")
-def pace_trend(limit: int = Query(30, ge=5, le=100)):
-    """Recent run paces for the trend line chart."""
-    rows = db.get_pace_trend(limit=limit)
-    return {
-        "labels":    [r["start_local"][:10] for r in rows],
-        "values":    [round(float(r["avg_pace_min_per_km"]), 3) for r in rows],
-        "distances": [round(float(r["distance_km"]), 1) for r in rows],
-    }
-
-
-@router.get("/hr-trend")
-def hr_trend(limit: int = Query(30, ge=5, le=100)):
-    """Average heart rate per run for the trend chart."""
-    rows = db.get_hr_trend(limit=limit)
-    return {
-        "labels":    [r["start_local"][:10] for r in rows],
-        "values":    [int(r["avg_hr"]) for r in rows],
-        "distances": [round(float(r["distance_km"]), 1) for r in rows],
-        "paces":     [round(float(r["avg_pace_min_per_km"]), 3)
-                      if r.get("avg_pace_min_per_km") else None
-                      for r in rows],
     }
 
 
@@ -189,6 +165,17 @@ def sleep_trend(weeks: int = Query(52, ge=4, le=260)):
     }
 
 
+@router.get("/sleep/hrv-trend")
+def sleep_hrv_trend():
+    """Weekly-averaged overnight HRV — the long-term recovery baseline."""
+    rows = db.get_weekly_hrv()
+    return {
+        "labels": [r["week_start"] for r in rows],
+        "hrv":    [int(r["hrv"]) if r["hrv"] is not None else None for r in rows],
+        "nights": [int(r["nights"]) for r in rows],
+    }
+
+
 @router.get("/sleep/nights/summary")
 def sleep_nights_summary():
     """Averages over the last 30 nights for the nightly stat cards."""
@@ -226,13 +213,17 @@ def sleep_nights(limit: int = Query(60, ge=7, le=400)):
 
 @router.get("/calories/summary")
 def calories_summary():
-    """Totals for the four calories stat cards (last 30 days)."""
+    """Burned-calorie averages (last 30 days) + average daily food intake."""
     s = db.get_calories_summary()
+    days = db.get_nutrition_days(limit=30)
+    intakes = [int(d["kcal"] or 0) for d in days if d.get("kcal")]
+    avg_intake = round(sum(intakes) / len(intakes)) if intakes else 0
     return {
         "days_tracked": int(s["days_tracked"]) if s.get("days_tracked") else 0,
         "avg_total":    int(s["avg_total"]) if s.get("avg_total") else 0,
         "avg_active":   int(s["avg_active"]) if s.get("avg_active") else 0,
         "avg_resting":  int(s["avg_resting"]) if s.get("avg_resting") else 0,
+        "avg_intake":   avg_intake,
     }
 
 
@@ -259,6 +250,151 @@ def nutrition_trend(days: int = Query(14, ge=3, le=120)):
         "fat_g":     [float(r["fat_g"] or 0) for r in rows],
         "kcal":      [int(r["kcal"] or 0) for r in rows],
     }
+
+
+def _plan_today(today_iso: str, weekday_name: str) -> dict:
+    """Find today's session in the active (or most recent) weekly plan."""
+    plans = db.list_weekly_plans()
+    if not plans:
+        return {"has": False}
+    accepted = [p for p in plans if p.get("status") == "accepted"]
+    chosen = accepted[0] if accepted else plans[0]
+
+    pj = chosen.get("plan_json")
+    if isinstance(pj, str):
+        try:
+            pj = json.loads(pj)
+        except Exception:
+            pj = {}
+    days = (pj or {}).get("days", []) or []
+
+    day = next((d for d in days if (d.get("date") or "") == today_iso), None)
+    if day is None:
+        day = next(
+            (d for d in days if (d.get("day") or "").lower() == weekday_name.lower()),
+            None,
+        )
+    if day is None:
+        return {"has": False}
+
+    wtype = (day.get("workout_type") or "easy").lower()
+    dist = float(day.get("distance_km") or 0)
+    dur = int(day.get("duration_min") or 0)
+    return {
+        "has": True,
+        "accepted": bool(accepted),
+        "workout_type": wtype,
+        "title": day.get("title") or "",
+        "distance_km": round(dist, 1),
+        "duration_min": dur,
+        "is_rest": wtype == "rest" or (dist == 0 and dur == 0),
+    }
+
+
+@router.get("/today")
+def today_overview():
+    """Cross-domain summary for the Today landing tab: readiness, planned
+    workout, energy balance, and a quick stats strip."""
+    today = date.today()
+    today_iso = today.isoformat()
+
+    # ── Readiness — last night's sleep ───────────────────────────────────
+    nights = db.get_sleep_nights(limit=1)
+    night = nights[-1] if nights else None
+    if night:
+        readiness = {
+            "has": True,
+            "score": int(night["score"]) if night.get("score") is not None else None,
+            "sleep_fmt": _fmt_hm(night.get("duration_min")),
+            "hrv_ms": int(night["hrv_ms"]) if night.get("hrv_ms") is not None else None,
+            "resting_hr": int(night["resting_hr"]) if night.get("resting_hr") is not None else None,
+            "night_date": night.get("night_date"),
+        }
+    else:
+        readiness = {"has": False}
+
+    # ── Energy balance — eaten (food log) vs burned (Garmin) ─────────────
+    nut = db.get_nutrition_day(today_iso)
+    eaten = int(nut.get("kcal") or 0)
+    has_eaten = int(nut.get("items") or 0) > 0
+
+    cal_rows = db.get_calories_days(limit=14)
+    by_date = {r["day_date"]: r for r in cal_rows}
+    crow = by_date.get(today_iso) or (cal_rows[-1] if cal_rows else None)
+    burned = int(crow["total_cal"]) if crow and crow.get("total_cal") is not None else 0
+    has_burned = crow is not None
+    energy = {
+        "eaten": eaten,
+        "burned": burned,
+        "balance": (eaten - burned) if (has_eaten and has_burned) else None,
+        "has_eaten": has_eaten,
+        "has_burned": has_burned,
+        "burned_date": crow["day_date"] if crow else None,
+    }
+
+    # ── Planned session today ────────────────────────────────────────────
+    plan = _plan_today(today_iso, today.strftime("%A"))
+
+    # ── Quick stats strip ────────────────────────────────────────────────
+    summary = db.get_stats_summary()
+    acts = db.get_recent_activities(days=200, limit=200)
+    vo2 = next((a.get("vo2max") for a in acts if a.get("vo2max")), None)
+    stats = {
+        "week_km": round(float(summary.get("week_km") or 0), 1),
+        "protein_g": round(float(nut.get("protein_g") or 0)) if has_eaten else None,
+        "resting_hr": readiness.get("resting_hr") if readiness.get("has") else None,
+        "vo2max": round(float(vo2), 1) if vo2 else None,
+    }
+
+    return {
+        "date": today_iso,
+        "date_fmt": f"{today.strftime('%A')}, {today.day} {today.strftime('%B %Y')}",
+        "readiness": readiness,
+        "energy": energy,
+        "plan": plan,
+        "stats": stats,
+    }
+
+
+@router.get("/energy-balance")
+def energy_balance(days: int = Query(14, ge=3, le=120)):
+    """Per-day net energy: calories eaten (food log) − calories burned (Garmin).
+
+    The day list is anchored on days you actually logged food (a balance is only
+    meaningful then). Burned comes from the Calories table; if a day hasn't been
+    synced, ``burned``/``net`` are null so the UI can show 'pending sync' rather
+    than a misleading number. ``net_sum`` totals only the days where both exist.
+    """
+    nut = {r["log_date"]: r for r in db.get_nutrition_days(limit=days)}
+    cal = {r["day_date"]: r for r in db.get_calories_days(limit=days + 7)}
+
+    out: list[dict] = []
+    net_sum = 0
+    for d in sorted(nut.keys())[-days:]:
+        eaten = int(nut[d]["kcal"] or 0)
+        crow = cal.get(d)
+        burned = int(crow["total_cal"]) if crow and crow.get("total_cal") is not None else None
+        net = (eaten - burned) if burned is not None else None
+        if net is not None:
+            net_sum += net
+        out.append({"date": d, "eaten": eaten, "burned": burned, "net": net})
+
+    return {"days": out, "net_sum": net_sum}
+
+
+@router.get("/training-load")
+def training_load(
+    weeks: int = Query(14, ge=4, le=52),
+    sport: str | None = Query(None, pattern="^(running|cycling)$"),
+):
+    """Weekly HR-based training load (Banister TRIMP), the acute:chronic workload
+    ratio (ACWR), and the HRV / resting-HR recovery overlay.
+
+    ``sport`` omitted = combined run + ride (the systemic load, used by Today);
+    ``running`` / ``cycling`` = a single-sport view for the per-sport tabs. The
+    maths lives in ``backend/training_load.py`` so the coach reads the same
+    numbers — see the docs' Scientific basis section."""
+    return training_load_mod.compute(weeks, sport=sport)
 
 
 @router.get("/aerobic-efficiency")
@@ -291,8 +427,42 @@ def aerobic_efficiency():
     weeks: dict[str, list[float]] = defaultdict(list)
     for run in runs:
         d = datetime.fromisoformat(run["date"])
-        monday = (d - timedelta(days=d.weekday())).strftime("%Y-%m-%d")
-        weeks[monday].append(run["efficiency"])
+        wk = (d - timedelta(days=(d.weekday() + 1) % 7)).strftime("%Y-%m-%d")
+        weeks[wk].append(run["efficiency"])
+
+    trend = [
+        {"date": week, "efficiency": round(sum(effs) / len(effs), 3)}
+        for week, effs in sorted(weeks.items())
+    ]
+
+    return {"runs": runs, "trend": trend}
+
+
+@router.get("/cycling/aerobic-efficiency")
+def cycling_aerobic_efficiency():
+    """Aerobic efficiency per ride (avg_speed_kmh / avg_hr * 100) + weekly trend.
+
+    The cycling analogue of the running chart: speed is recorded directly, so
+    efficiency is simply speed ÷ heart rate. Higher = faster for the same effort.
+    Same {runs, trend} shape as ``/aerobic-efficiency`` so the frontend reuses it.
+    """
+    rows = db.get_cycling_aerobic_efficiency_rides()
+    if not rows:
+        return {"runs": [], "trend": []}
+
+    runs: list[dict] = []
+    for r in rows:
+        spd = float(r["avg_speed_kmh"])
+        hr = float(r["avg_hr"])
+        if spd <= 0 or hr <= 0:
+            continue
+        runs.append({"date": r["start_local"][:10], "efficiency": round(spd / hr * 100, 3)})
+
+    weeks: dict[str, list[float]] = defaultdict(list)
+    for run in runs:
+        d = datetime.fromisoformat(run["date"])
+        wk = (d - timedelta(days=(d.weekday() + 1) % 7)).strftime("%Y-%m-%d")
+        weeks[wk].append(run["efficiency"])
 
     trend = [
         {"date": week, "efficiency": round(sum(effs) / len(effs), 3)}

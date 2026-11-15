@@ -7,17 +7,17 @@ in the prompt. Separate agent, separate chat channel.
 from __future__ import annotations
 
 import json
-import logging
 from datetime import date
 from typing import Any
 
 from anthropic import Anthropic
 
 from . import config, db
+from .agent import run_tool_loop
 
-logger = logging.getLogger(__name__)
-
-MODEL = "claude-opus-4-7"
+# Food logging is a simple lookup/arithmetic/confirm task (with occasional
+# vision), so a faster model keeps replies snappy with no meaningful quality loss.
+MODEL = "claude-sonnet-4-6"
 MAX_TOOL_ITERATIONS = 10
 
 
@@ -210,45 +210,14 @@ def chat(
     messages: list[dict[str, Any]] = list(history or [])
     messages.append({"role": "user", "content": content})
 
-    final_text = ""
-    for _ in range(MAX_TOOL_ITERATIONS):
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=4096,
-            system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-            tools=TOOLS,
-            messages=messages,
-        )
-        messages.append({"role": "assistant", "content": response.content})
-
-        if response.stop_reason == "tool_use":
-            tool_results = []
-            for block in response.content:
-                if getattr(block, "type", None) != "tool_use":
-                    continue
-                try:
-                    result = _run_tool(block.name, dict(block.input or {}))
-                    is_error = False
-                except Exception as e:  # noqa: BLE001
-                    logger.exception("Nutrition tool %s failed", block.name)
-                    result = json.dumps({"error": f"{type(e).__name__}: {e}"})
-                    is_error = True
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": result,
-                    "is_error": is_error,
-                })
-            messages.append({"role": "user", "content": tool_results})
-            continue
-
-        if response.stop_reason == "pause_turn":
-            continue
-
-        text_blocks = [b.text for b in response.content if getattr(b, "type", None) == "text"]
-        final_text = "\n\n".join(text_blocks).strip()
-        break
-    else:
-        final_text = "(nutrition agent hit its tool-use limit — try rephrasing)"
-
-    return final_text or "(empty response)"
+    return run_tool_loop(
+        client=client,
+        model=MODEL,
+        system_text=SYSTEM_PROMPT,
+        tools=TOOLS,
+        run_tool=_run_tool,
+        messages=messages,
+        max_iterations=MAX_TOOL_ITERATIONS,
+        label="nutrition",
+        max_tokens=1024,   # food replies are short; smaller cap = faster
+    )

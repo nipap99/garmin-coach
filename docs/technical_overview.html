@@ -163,6 +163,7 @@
   .callout.blue  { background: #eff5ff; border-left: 4px solid #4f8cff; color: #2c4a8a; }
   .callout.green { background: #edfbf3; border-left: 4px solid #1f8a4c; color: #1a5c35; }
   .callout.orange{ background: #fff8ec; border-left: 4px solid #f5a623; color: #7a4f0a; }
+  .callout.purple{ background: #f6f0ff; border-left: 4px solid #6610f2; color: #4a2a8a; }
 
   /* ── Code blocks ─────────────────────────────────────────────────── */
   .code-label {
@@ -336,6 +337,8 @@
     A local AI app that ingests Garmin <strong>running, cycling, sleep and
     calories</strong> data, lets you log <strong>food</strong> (by text or photo),
     and runs two Claude agents — a holistic running coach and a nutrition logger.
+    A redesigned <strong>light UI</strong> with a sidebar opens on a <strong>Today</strong>
+    dashboard, and the weekly plan now lives inside the coach conversation.
   </p>
   <div class="cover-meta">
     <div class="cover-meta-item">
@@ -344,11 +347,11 @@
     </div>
     <div class="cover-meta-item">
       <span class="cover-meta-label">Date</span>
-      <span class="cover-meta-value">June 2026</span>
+      <span class="cover-meta-value">October 2026</span>
     </div>
     <div class="cover-meta-item">
       <span class="cover-meta-label">Version</span>
-      <span class="cover-meta-value">4.0 · nutrition + holistic coach</span>
+      <span class="cover-meta-value">5.6 · 3 quality runs + 2× strength + recomp nutrition (Mon–Sat)</span>
     </div>
   </div>
   <div class="cover-badge-row">
@@ -373,7 +376,8 @@
     <li><span class="toc-num">3</span><span class="toc-title">Backend — FastAPI</span><span class="toc-dots"></span></li>
     <li><span class="toc-num">4</span><span class="toc-title">Database — PostgreSQL</span><span class="toc-dots"></span></li>
     <li><span class="toc-num">5</span><span class="toc-title">CSV Importer</span><span class="toc-dots"></span></li>
-    <li><span class="toc-num">6</span><span class="toc-title">Playwright Sync (Browser Automation)</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">6</span><span class="toc-title">Playwright Sync (Browser Automation) — legacy</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">6B</span><span class="toc-title">Garmin API Sync (current)</span><span class="toc-dots"></span></li>
     <li><span class="toc-num">7</span><span class="toc-title">Claude AI Integration</span><span class="toc-dots"></span></li>
     <li><span class="toc-num">8</span><span class="toc-title">Frontend — HTMX + Chart.js</span><span class="toc-dots"></span></li>
     <li><span class="toc-num">9</span><span class="toc-title">Data flow — end to end</span><span class="toc-dots"></span></li>
@@ -381,6 +385,11 @@
     <li><span class="toc-num">11</span><span class="toc-title">Technology choices</span><span class="toc-dots"></span></li>
     <li><span class="toc-num">12</span><span class="toc-title">Sleep tracking</span><span class="toc-dots"></span></li>
     <li><span class="toc-num">13</span><span class="toc-title">Calories &amp; the nutrition agent</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">14</span><span class="toc-title">The Today dashboard — integrated metrics</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">15</span><span class="toc-title">Scientific basis — why these formulas</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">16</span><span class="toc-title">The MCP coach — chatting with your data</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">17</span><span class="toc-title">The weekly fitness report — automation</span><span class="toc-dots"></span></li>
+    <li><span class="toc-num">18</span><span class="toc-title">Desktop launch &amp; polish</span><span class="toc-dots"></span></li>
   </ul>
 </div>
 
@@ -406,14 +415,16 @@
 
   <h3>Core capabilities</h3>
   <ul>
+    <li><strong>Today dashboard</strong> — the landing view (§14): last night's readiness, today's planned session, <strong>energy balance</strong> (eaten vs burned), and <strong>training load</strong> (run + ride) vs recovery, pulled from every domain into one glance</li>
+    <li><strong>Redesigned UI</strong> — a light theme with a left sidebar and clean line-icon navigation, replacing the old dark top-tab layout</li>
     <li><strong>Multi-sport data ingestion</strong> — imports Garmin CSV exports (manual) or automates the export via a real Chrome browser; one sync session pulls both running and cycling</li>
     <li><strong>Deduplication</strong> — importing the same file twice never creates duplicate entries</li>
-    <li><strong>Running tab</strong> — weekly mileage, pace trend, heart-rate trend, personal records</li>
-    <li><strong>Cycling tab</strong> — weekly distance, speed trend, heart-rate trend (kept fully separate from running so neither pollutes the other)</li>
-    <li><strong>AI weekly plans</strong> — generates a structured 7-day plan, or turns a plan you paste from the coach chat into a saved Mon–Sun calendar</li>
-    <li><strong>AI coaching chat</strong> — streaming conversation with real-time context from your activities</li>
+    <li><strong>Running tab</strong> — weekly mileage, <strong>running load (TRIMP)</strong>, <strong>ACWR</strong> with its 0.8–1.3 safe band, and personal records</li>
+    <li><strong>Cycling tab</strong> — weekly distance, speed trend, heart-rate trend, and an aerobic-efficiency trend (kept fully separate from running so neither pollutes the other)</li>
+    <li><strong>AI weekly plan</strong> — agree a week with the coach in conversation, then one click structures it into a saved Mon–Sun calendar shown right below the chat (one plan at a time)</li>
+    <li><strong>AI coaching chat</strong> — a tool-use conversation grounded in your live activity, sleep, and nutrition data</li>
     <li><strong>Goals &amp; fitness tracking</strong> — race targets plus an aerobic-efficiency trend (speed ÷ heart rate over time)</li>
-    <li><strong>Sleep tab</strong> — per-night detail (deep/light/REM stages, HRV, recovery metrics) over a weekly long-term backdrop, synced on demand</li>
+    <li><strong>Sleep tab</strong> — per-night detail (deep/light/REM stages, HRV, recovery metrics) over a weekly long-term backdrop, each with its own sync button (nightly vs the 1-year history)</li>
     <li><strong>Calories tab</strong> — daily calories burned (resting + active), scraped from Garmin's table (no CSV export exists for it)</li>
     <li><strong>Food / nutrition agent</strong> — a second Claude agent: tell it what you ate (text or photo) and it logs each item, builds a personal food library, and tracks daily protein/fat/carbs/kcal</li>
     <li><strong>Holistic coach</strong> — the running coach factors in cycling load, sleep recovery, and food intake (energy in vs out), steered by an editable plain-English preferences file</li>
@@ -448,11 +459,15 @@
   <div class="arch">
     <div class="arch-label">USER INTERFACE (browser at localhost:8000)</div>
     <div class="arch-box">
-      <div class="arch-title">frontend/index.html — Single Page Application</div>
+      <div class="arch-title">frontend/index.html — Single Page App (left sidebar · light theme)</div>
       <div class="arch-row">
         <div class="arch-box" style="background:#0f1117">
+          <span class="blue">▦ Today</span><br>
+          <span class="muted" style="font-size:0.72rem">readiness · balance<br>training load</span>
+        </div>
+        <div class="arch-box" style="background:#0f1117">
           <span class="blue">🏃 Running</span><br>
-          <span class="muted" style="font-size:0.72rem">Sync Running<br>mileage·pace·HR·PRs</span>
+          <span class="muted" style="font-size:0.72rem">Sync Running<br>mileage·load·ACWR·PRs</span>
         </div>
         <div class="arch-box" style="background:#0f1117">
           <span class="blue">🚴 Cycling</span><br>
@@ -467,8 +482,8 @@
           <span class="muted" style="font-size:0.72rem">burned: rest+active<br>scraped table</span>
         </div>
         <div class="arch-box" style="background:#0f1117">
-          <span class="blue">📅 Plan</span><br>
-          <span class="muted" style="font-size:0.72rem">generate / paste<br>→ week calendar</span>
+          <span class="blue">🍽️ Food</span><br>
+          <span class="muted" style="font-size:0.72rem">log by text/photo<br>daily macros</span>
         </div>
         <div class="arch-box" style="background:#0f1117">
           <span class="blue">🎯 Goals</span><br>
@@ -476,11 +491,7 @@
         </div>
         <div class="arch-box" style="background:#0f1117">
           <span class="blue">💬 Coach</span><br>
-          <span class="muted" style="font-size:0.72rem">holistic chat<br>+ plans</span>
-        </div>
-        <div class="arch-box" style="background:#0f1117">
-          <span class="blue">🍽️ Food</span><br>
-          <span class="muted" style="font-size:0.72rem">log by text/photo<br>daily macros</span>
+          <span class="muted" style="font-size:0.72rem">holistic chat +<br>this week's plan</span>
         </div>
       </div>
     </div>
@@ -493,8 +504,8 @@
       <div class="arch-row">
         <div class="arch-box" style="background:#0f1117"><span class="green">activities.py</span><br><span class="muted" style="font-size:0.72rem">/sync · /sync/running · /import</span></div>
         <div class="arch-box" style="background:#0f1117"><span class="green">stats.py</span><br><span class="muted" style="font-size:0.72rem">/stats + /stats/cycling</span></div>
-        <div class="arch-box" style="background:#0f1117"><span class="green">plans.py</span><br><span class="muted" style="font-size:0.72rem">/plans/generate</span></div>
-        <div class="arch-box" style="background:#0f1117"><span class="green">chat.py</span><br><span class="muted" style="font-size:0.72rem">/chat (streaming)</span></div>
+        <div class="arch-box" style="background:#0f1117"><span class="green">plans.py</span><br><span class="muted" style="font-size:0.72rem">/plans/from-coach</span></div>
+        <div class="arch-box" style="background:#0f1117"><span class="green">chat.py</span><br><span class="muted" style="font-size:0.72rem">/chat (coach turn)</span></div>
       </div>
       <div class="arch-row">
         <div class="arch-box" style="background:#0f1117"><span class="green">nutrition.py</span><br><span class="muted" style="font-size:0.72rem">/food agent + log</span></div>
@@ -519,8 +530,9 @@
       </div>
       <div class="arch-box" style="flex:1">
         <div class="arch-title">Anthropic Claude API</div>
-        <span class="purple">claude-opus-4-7</span><br>
-        <span class="muted" style="font-size:0.72rem">coach · nutrition · plans · vision</span>
+        <span class="purple">Opus 4.7</span> coach · plans<br>
+        <span class="purple">Sonnet 4.6</span> nutrition · vision<br>
+        <span class="muted" style="font-size:0.72rem">one shared tool-use loop</span>
       </div>
       <div class="arch-box" style="flex:1">
         <div class="arch-title">Garmin Connect</div>
@@ -572,8 +584,8 @@ app.<span class="fn">include_router</span>(chat_routes.router)
   <table>
     <tr><th>File</th><th>URL prefix</th><th>Responsibility</th></tr>
     <tr><td><code>routes/activities.py</code></td><td><code>/sync</code>, <code>/sync/running</code>, <code>/import/csv</code></td><td>Dual-sport sync, running-only sync, and manual CSV import</td></tr>
-    <tr><td><code>routes/stats.py</code></td><td><code>/stats/*</code>, <code>/stats/cycling/*</code></td><td>JSON for running charts, cycling charts, and aerobic efficiency</td></tr>
-    <tr><td><code>routes/plans.py</code></td><td><code>/plans/*</code></td><td>Generate AI plans, or parse a pasted plan into a saved calendar</td></tr>
+    <tr><td><code>routes/stats.py</code></td><td><code>/stats/*</code>, <code>/stats/cycling/*</code></td><td>JSON for all charts: running, cycling, aerobic efficiency (both sports), today, energy balance, training load</td></tr>
+    <tr><td><code>routes/plans.py</code></td><td><code>/plans/*</code></td><td>Save the agreed plan from the coach's last message; serve it as a calendar</td></tr>
     <tr><td><code>routes/goals.py</code></td><td><code>/goals/*</code></td><td>Create, read, update, delete race and training goals</td></tr>
     <tr><td><code>routes/chat.py</code></td><td><code>/chat</code></td><td>Streaming AI coaching conversation with activity context</td></tr>
   </table>
@@ -807,9 +819,18 @@ _pool = <span class="cl">ConnectionPool</span>(
   <div class="callout blue">
     <span class="callout-icon">🔒</span>
     <div>
-      <strong>Why not the official Garmin API?</strong> Garmin's developer program is B2B-only —
-      it requires a registered company and a formal application process. For personal use,
-      browser automation against the same website you log into manually is the only stable path.
+      <strong>Why not the official Garmin API?</strong> Garmin's <em>developer</em> program is
+      B2B-only — it requires a registered company and a formal application process. Browser
+      automation against the same website you log into manually was the original path.
+    </div>
+  </div>
+
+  <div class="callout orange">
+    <span class="callout-icon">⚠️</span>
+    <div>
+      <strong>This section is now legacy.</strong> Sleep, running, cycling, and calories all sync
+      through Garmin's <em>internal web JSON API</em> instead — see <strong>§6B</strong>. This
+      browser path is kept only for the manual "Import CSV" upload and as a documented fallback.
     </div>
   </div>
 
@@ -911,6 +932,145 @@ context.<span class="fn">add_init_script</span>(
 </div>
 
 <!-- ══════════════════════════════════════════════════════════════════
+     6B — GARMIN API SYNC
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num green">6B</div>
+    <h2>Garmin API Sync — the Current Path</h2>
+  </div>
+
+  <p>
+    Every Sync button now reads from Garmin Connect's <strong>internal web JSON API</strong>
+    (the same endpoints Garmin's own website calls) instead of driving a browser. It logs in
+    once with the <code>garminconnect</code> library, caches the OAuth token, and then pulls
+    clean JSON straight from <code>connectapi.garmin.com</code> — no page rendering, no export
+    button to hunt for, nothing to break when Garmin's UI changes.
+  </p>
+
+  <div class="callout orange">
+    <span class="callout-icon">🩺</span>
+    <div>
+      <strong>What forced the change.</strong> Garmin's <code>/app/sleep</code> web page began
+      serving a "Looks Like We Crashed" render error server-side — it never even fetches the
+      sleep data before failing, so there was nothing for the browser scraper to read. The API
+      returns that same data reliably, so sleep moved first; running, cycling, and calories
+      followed for consistency and richer data.
+    </div>
+  </div>
+
+  <div class="callout green">
+    <span class="callout-icon">✅</span>
+    <div>
+      <strong>What the API gives that the browser CSV never could.</strong> Real Garmin
+      <code>activityId</code>s (not synthetic hashes), <strong>VO2max</strong> (absent from the
+      CSV — this was the "dashboard shows 56, watch shows 58" gap), HR-zone time, training
+      effect, and — for sleep — HRV, body battery, respiration and stress, all in one call.
+    </div>
+  </div>
+
+  <h3>The client &amp; token cache</h3>
+  <p>
+    <code>backend/garmin_api.py</code> owns a single logged-in client. One
+    <code>login(token_dir)</code> call does both jobs: if a saved token exists it resumes with
+    no network login; otherwise it authenticates with the <code>.env</code> credentials and
+    persists the token to <code>data/garmin_tokens/</code> for next time. The client is also
+    cached in-process, so a burst of syncs shares one session.
+  </p>
+
+  <div class="code-label">backend/garmin_api.py — log in once, then reuse</div>
+  <pre><span class="kw">def</span> <span class="fn">_client</span>():
+    <span class="kw">if</span> _client_cache <span class="kw">is</span> <span class="kw">not</span> <span class="kw">None</span>:
+        <span class="kw">return</span> _client_cache                 <span class="cm"># in-process reuse</span>
+    g = <span class="fn">Garmin</span>(config.GARMIN_EMAIL, config.GARMIN_PASSWORD)
+    mfa, _ = g.<span class="fn">login</span>(<span class="fn">str</span>(config.GARMIN_TOKEN_DIR))  <span class="cm"># resume OR login+persist</span>
+    <span class="kw">if</span> mfa:
+        <span class="kw">raise</span> <span class="cl">RuntimeError</span>(<span class="st">"MFA code needed — clear it once in a browser login"</span>)
+    _client_cache = g
+    <span class="kw">return</span> g</pre>
+
+  <div class="callout blue">
+    <span class="callout-icon">⏳</span>
+    <div>
+      <strong>Rate limits apply to logins, not data.</strong> Garmin throttles repeated
+      <em>logins</em> (a burst returns <code>429</code>, then <code>401 "Failed to retrieve
+      social profile"</code> for ~15–60 min). Because the token is cached, the app logs in once
+      and resumes forever after — the <code>get_sleep_data</code> / <code>get_activities</code> /
+      <code>get_stats</code> reads themselves are not the limited part.
+    </div>
+  </div>
+
+  <h3>What each button maps to</h3>
+  <table class="tech-table">
+    <thead>
+      <tr><th>Button → route</th><th>API call</th><th>Stored as</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Sync Sleep</strong> → <code>/sync/sleep</code></td>
+        <td><code>get_sleep_data(date)</code></td>
+        <td>one <code>sleep_nights</code> row (score, stages, HRV, resting HR, respiration…)</td>
+      </tr>
+      <tr>
+        <td><strong>Sync Sleep History</strong> → <code>/sync/sleep/weekly</code></td>
+        <td><code>get_sleep_data</code> × ~60 days</td>
+        <td>backfills <code>sleep_nights</code> per night</td>
+      </tr>
+      <tr>
+        <td><strong>Sync / Sync Running</strong> → <code>/sync</code>, <code>/sync/running</code></td>
+        <td><code>get_activities(0, 30)</code> + <code>get_max_metrics</code></td>
+        <td><code>activities</code> rows (real ids, pace/speed, VO2max on newest run)</td>
+      </tr>
+      <tr>
+        <td><strong>Sync Calories</strong> → <code>/sync/calories</code></td>
+        <td><code>get_stats(date)</code> × 7 days</td>
+        <td><code>calories</code> rows (active / resting / total kcal)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Activities: how the JSON becomes a row</h3>
+  <p>
+    Garmin has many sport sub-types; they're folded into the two families the app tracks. Pace
+    is derived for runs and speed for rides, straight from distance and duration. The full raw
+    JSON is kept in <code>raw_json</code> for later use (HR zones, training effect).
+  </p>
+
+  <div class="code-label">backend/garmin_api.py — activity mapping (abridged)</div>
+  <pre><span class="kw">def</span> <span class="fn">_activity_summary</span>(a):
+    family = <span class="fn">_activity_family</span>(a[<span class="st">"activityType"</span>][<span class="st">"typeKey"</span>])  <span class="cm"># run | cycle | skip</span>
+    dist_km = a[<span class="st">"distance"</span>] / <span class="nm">1000</span>
+    dur_min = a[<span class="st">"duration"</span>] / <span class="nm">60</span>
+    <span class="kw">return</span> {
+        <span class="st">"id"</span>: a[<span class="st">"activityId"</span>],                 <span class="cm"># REAL positive id</span>
+        <span class="st">"start_local"</span>: a[<span class="st">"startTimeLocal"</span>],
+        <span class="st">"avg_pace_min_per_km"</span>: dur_min / dist_km <span class="kw">if</span> family == <span class="st">"running"</span> <span class="kw">else</span> <span class="kw">None</span>,
+        <span class="st">"avg_speed_kmh"</span>: dist_km / (dur_min / <span class="nm">60</span>) <span class="kw">if</span> family == <span class="st">"cycling"</span> <span class="kw">else</span> <span class="kw">None</span>,
+        <span class="st">"vo2max"</span>: <span class="kw">None</span>,                          <span class="cm"># enriched from get_max_metrics</span>
+        ...
+    }</pre>
+
+  <div class="callout green">
+    <span class="callout-icon">🔗</span>
+    <div>
+      <strong>API rows upgrade CSV rows — they don't duplicate them.</strong> Both paths write
+      through <code>db.upsert_activity</code>, which dedups on the start-minute and uses
+      <code>COALESCE</code> while keeping the largest id (§4). A real positive Garmin id beats an
+      old synthetic negative one, and VO2max fills in where the CSV left a blank — so an API
+      sync silently enriches history imported earlier from CSV.
+    </div>
+  </div>
+
+  <h3>Both worlds, on purpose</h3>
+  <p>
+    The legacy paths are not gone. <code>csv_importer.py</code> still powers the manual
+    <strong>Import CSV</strong> upload (drop in any Garmin export), and the Playwright modules
+    (§6) remain on disk as a documented fallback. The API is simply the default the buttons use
+    now.
+  </p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
      7 — CLAUDE AI
 ════════════════════════════════════════════════════════════════════ -->
 <div class="section">
@@ -920,38 +1080,45 @@ context.<span class="fn">add_init_script</span>(
   </div>
 
   <p>
-    We use the <strong>Anthropic Python SDK</strong> to call Claude in several distinct ways:
-    streaming chat for the coaching conversation, structured JSON generation for weekly plans,
-    and <strong>two tool-use agents</strong> — the holistic coach and a separate nutrition agent
-    (§13) — that call functions to read and write the local database instead of holding all the
-    data in the prompt.
+    We use the <strong>Anthropic Python SDK</strong> in two ways: a shared <strong>tool-use loop</strong>
+    that powers both agents — the holistic coach and the nutrition logger (§13) — and a one-shot
+    <strong>structured-JSON</strong> call that turns the coach's plan into a calendar (later in this
+    section). The agents call functions to read and write the local database rather than holding all
+    the data in the prompt, so token cost stays roughly flat as the database grows.
   </p>
 
-  <h3>Streaming chat</h3>
+  <h3>One shared tool-use loop</h3>
   <p>
-    The coaching chat uses <strong>streaming</strong> — Claude sends its response token by token
-    as it generates it, rather than waiting until the full answer is ready. This makes the
-    conversation feel live and responsive, like watching someone type.
+    Both agents run the identical loop, factored into <code>backend/agent.py</code>: send the
+    conversation to Claude with a set of tools, run whatever tools the model asks for, feed the
+    results back, and repeat until it returns plain text. Only the model, system prompt, tools and
+    tool dispatcher differ — so the loop is written once instead of copied into each agent.
   </p>
 
-  <div class="code-label">backend/routes/chat.py — streaming response</div>
-  <pre><span class="kw">with</span> anthropic_client.messages.<span class="fn">stream</span>(
-    model=<span class="st">"claude-opus-4-7"</span>,
-    system=<span class="st">f"""You are an expert running coach.
-The athlete's recent stats: {stats_summary}
-Their current goals: {goals}
-Their personal records: {personal_records}"""</span>,
-    messages=conversation_history,
-) <span class="kw">as</span> stream:
-    <span class="kw">for</span> text <span class="kw">in</span> stream.text_stream:
-        <span class="kw">yield</span> text   <span class="cm"># each token sent to browser immediately</span></pre>
+  <div class="code-label">backend/agent.py — run_tool_loop (shared by coach + nutrition)</div>
+  <pre><span class="kw">for</span> _ <span class="kw">in</span> <span class="fn">range</span>(max_iterations):
+    resp = client.messages.<span class="fn">create</span>(
+        model=model, tools=tools, messages=messages,
+        system=[{<span class="st">"text"</span>: system_text,
+                 <span class="st">"cache_control"</span>: {<span class="st">"type"</span>: <span class="st">"ephemeral"</span>}}],  <span class="cm"># prompt cached</span>
+        **opts)                                   <span class="cm"># coach adds thinking + effort</span>
+    messages.<span class="fn">append</span>({<span class="st">"role"</span>: <span class="st">"assistant"</span>, <span class="st">"content"</span>: resp.content})
+
+    <span class="kw">if</span> resp.stop_reason == <span class="st">"tool_use"</span>:
+        results = [<span class="fn">run_tool</span>(b.name, b.input) <span class="kw">for</span> b <span class="kw">in</span> resp.content
+                   <span class="kw">if</span> b.type == <span class="st">"tool_use"</span>]
+        messages.<span class="fn">append</span>({<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: results})  <span class="cm"># tool_result blocks</span>
+        <span class="kw">continue</span>
+    <span class="kw">return</span> text_of(resp)        <span class="cm"># end_turn → the final answer</span></pre>
 
   <div class="callout blue">
-    <span class="callout-icon">💡</span>
+    <span class="callout-icon">⚡</span>
     <div>
-      <strong>Context injection:</strong> Before calling Claude, we fetch your real activity data from
-      the database and embed it in the system prompt. Claude is not guessing — it is reasoning
-      about your actual 873 runs, your specific goals, and your real personal records.
+      <strong>A model matched to each job.</strong> The coach runs on <strong>Opus 4.7</strong>
+      (adaptive thinking, high effort) because training advice rewards deep reasoning; the nutrition
+      agent runs on the faster <strong>Sonnet 4.6</strong> — food logging is mostly lookup, arithmetic
+      and confirmation, so the lighter model keeps replies snappy. The system prompt is constant
+      across a turn, so it's <code>cache_control</code>-cached to cut both cost and latency.
     </div>
   </div>
 
@@ -969,7 +1136,8 @@ get_recent_sleep        <span class="cm"># nightly duration, stages, HRV</span>
 get_recent_calories     <span class="cm"># energy BURNED (resting + active)</span>
 get_recent_nutrition    <span class="cm"># energy EATEN (the four daily totals)</span>
 get_goals               <span class="cm"># race targets + training goals</span>
-get_pr_progression      <span class="cm"># personal-record history</span></pre>
+get_pr_progression      <span class="cm"># personal-record history</span>
+get_training_load       <span class="cm"># weekly TRIMP load + ACWR + HRV (§14–15)</span></pre>
   <p>
     With cycling, sleep, calories-burned and food-intake all on tap, the coach reasons about
     <strong>energy balance</strong> (eaten vs. burned), recovery (sleep + HRV before hard days), and
@@ -986,49 +1154,35 @@ get_pr_progression      <span class="cm"># personal-record history</span></pre>
     </div>
   </div>
 
-  <h3>Weekly plan generation — structured output</h3>
+  <h3>The weekly plan — structured straight from the conversation</h3>
   <p>
-    For weekly plans we use a <strong>structured prompt</strong>: we instruct Claude to respond
-    exclusively in a specific JSON format. We then extract the JSON with a regex, validate it
-    has exactly 7 days, and store it in the database.
+    There is no separate "generate a plan" screen any more. You settle on a week with the coach
+    in ordinary conversation; when you're happy, one click on <strong>Save this week's plan</strong>
+    (under the chat) sends the coach's <em>most recent message</em> to
+    <code>POST /plans/from-coach</code>. That route asks Claude to convert whatever free-form prose
+    the coach wrote into a strict 7-day JSON schema — the same <strong>structured-output</strong>
+    trick as before, now sourced from the chat itself instead of a form.
   </p>
 
-  <div class="code-label">backend/routes/plans.py — structured JSON prompt</div>
-  <pre>prompt = <span class="st">f"""
-Generate a 7-day training plan. Respond ONLY with valid JSON,
-no explanation, no markdown fences:
-{{
-  "week_theme": "...",
-  "days": [
-    {{
-      "day": "Monday",
-      "workout_type": "easy",   <span class="cm">// easy|tempo|intervals|long|rest|cross</span>
-      "title": "Easy recovery run",
-      "description": "...",
-      "distance_km": 8,
-      "duration_min": 50
-    }},
-    ...  <span class="cm">// 7 days total</span>
-  ]
-}}
+  <div class="code-label">backend/routes/plans.py — structure the coach's last message</div>
+  <pre><span class="cm"># the newest assistant turn in the coach channel</span>
+last = <span class="fn">next</span>(m[<span class="st">"content"</span>] <span class="kw">for</span> m <span class="kw">in</span> <span class="fn">reversed</span>(history) <span class="kw">if</span> m[<span class="st">"role"</span>] == <span class="st">"assistant"</span>)
 
-Athlete context:
-- Total runs: {stats["total_runs"]}, Total km: {stats["total_km"]}
-- This week: {stats["this_week_km"]} km
-- Goals: {goals_text}
-"""</span>
+prompt = <span class="st">f"""Convert this free-text running plan into a strict 7-day week.
+--- PLAN TEXT ---
+{last}
+Return ONLY JSON, no fences:
+{{ "week_start", "summary", "weekly_km",
+   "days": [ 7 × {{ "day", "date", "workout_type", "title", "description", ... }} ] }}"""</span>
 
-<span class="cm"># Extract JSON from response using regex (robust to extra text)</span>
-match = re.<span class="fn">search</span>(<span class="st">r'\{.*\}'</span>, response, re.DOTALL)
-plan = json.<span class="fn">loads</span>(match.<span class="fn">group</span>())</pre>
+plan = json.<span class="fn">loads</span>(re.<span class="fn">search</span>(<span class="st">r'\{[\s\S]*\}'</span>, reply).<span class="fn">group</span>())
+<span class="kw">assert</span> <span class="fn">len</span>(plan[<span class="st">"days"</span>]) == <span class="nm">7</span>          <span class="cm"># validate before saving</span></pre>
 
-  <h3>Paste-a-plan → calendar</h3>
   <p>
-    The same structured-output trick powers a second flow: paste any free-text plan the coach
-    wrote in the chat into the Training Plan tab, and <code>POST /plans/parse</code> sends it to
-    Claude with a "convert this to the 7-day JSON schema" prompt. The result is saved
-    (<code>weekly_plans</code>, tagged <code>source: "chat"</code>) and rendered as a Mon–Sun
-    calendar — turning loose prose into a structured, persistent week.
+    The result is saved to <code>weekly_plans</code> tagged <code>source: "chat"</code> and marked
+    <code>accepted</code> — the single plan you agreed to — and any previous one is archived. It
+    renders as a Mon–Sun calendar directly below the chat, and the <strong>Today</strong> dashboard
+    reads the same plan for its "planned today" card. One conversation, one plan, one place.
   </p>
 
   <h3>Workout badge colours</h3>
@@ -1083,8 +1237,10 @@ plan = json.<span class="fn">loads</span>(match.<span class="fn">group</span>())
     parallel with <code>Promise.all()</code> and renders together. Charts are <strong>lazy</strong>
     — each tab initialises only the first time it's opened (separate <code>dashReady</code> /
     <code>cycReady</code> / <code>goalsReady</code> flags), so nothing loads until you look at it.
-    Running charts are blue/green; cycling charts are purple, so the two sports read differently
-    at a glance.
+    All charts share one styling source: a single <code>PALETTE</code> object plus
+    <code>Chart.defaults</code> (font, muted axis colour, gridlines) set once, so every chart reads
+    as a family — running blue, cycling purple, sleep indigo, calories amber — with one tooltip
+    style throughout.
   </p>
 
   <div class="code-label">Lazy chart initialisation</div>
@@ -1099,36 +1255,43 @@ plan = json.<span class="fn">loads</span>(match.<span class="fn">group</span>())
 }
 
 <span class="kw">async function</span> <span class="fn">initCharts</span>() {
-    <span class="cm">// Fetch all 5 endpoints in parallel</span>
-    <span class="kw">const</span> [summary, mileage, pace, hr, prs] = <span class="kw">await</span> Promise.<span class="fn">all</span>([
+    <span class="cm">// Fetch all 4 endpoints in parallel</span>
+    <span class="kw">const</span> [summary, mileage, load, prs] = <span class="kw">await</span> Promise.<span class="fn">all</span>([
         <span class="fn">fetch</span>(<span class="st">'/stats/summary'</span>).<span class="fn">then</span>(r => r.<span class="fn">json</span>()),
         <span class="fn">fetch</span>(<span class="st">'/stats/weekly-mileage'</span>).<span class="fn">then</span>(r => r.<span class="fn">json</span>()),
-        <span class="fn">fetch</span>(<span class="st">'/stats/pace-trend'</span>).<span class="fn">then</span>(r => r.<span class="fn">json</span>()),
-        <span class="fn">fetch</span>(<span class="st">'/stats/hr-trend'</span>).<span class="fn">then</span>(r => r.<span class="fn">json</span>()),
+        <span class="fn">fetch</span>(<span class="st">'/stats/training-load?sport=running'</span>).<span class="fn">then</span>(r => r.<span class="fn">json</span>()),
         <span class="fn">fetch</span>(<span class="st">'/stats/prs'</span>).<span class="fn">then</span>(r => r.<span class="fn">json</span>()),
     ]);
     <span class="cm">// Render charts with the received data...</span>
 }</pre>
 
-  <h3>Responsive layout</h3>
+  <h3>Navigation &amp; responsive layout</h3>
+  <p>
+    Navigation is a persistent <strong>left sidebar</strong> of icon + label items (Tabler line
+    icons via a single CSS webfont). Every button carries a <code>data-tab</code> attribute, so the
+    same lazy <code>showTab()</code> logic drives both the sidebar and the mobile nav unchanged.
+  </p>
   <table>
     <tr><th>Screen size</th><th>Navigation</th><th>Charts</th></tr>
-    <tr><td>Desktop (&gt; 767px)</td><td>Horizontal tab bar at top</td><td>2 × 2 grid</td></tr>
-    <tr><td>Mobile (&lt; 767px)</td><td>Fixed bottom nav with emoji icons 🏃🚴📅🎯💬</td><td>Single column stack</td></tr>
+    <tr><td>Desktop (&gt; 767px)</td><td>Left sidebar — icon + label, sticky full height</td><td>2 × 2 grid</td></tr>
+    <tr><td>Mobile (&lt; 767px)</td><td>Sidebar hides; horizontally-scrollable bottom nav with line icons</td><td>Single column stack</td></tr>
   </table>
 
   <p>
-    No CSS framework is used. All styling is custom CSS using variables for the dark theme,
-    making it trivial to change the colour scheme in one place.
+    No CSS framework is used. All styling is custom CSS driven by variables, so the whole
+    <strong>light theme</strong> is defined in one place — flipping these tokens (plus a few
+    overlay/gridline values) is what turned the app from its original dark theme to the current
+    white one.
   </p>
 
   <div class="code-label">CSS custom properties (theme variables)</div>
   <pre><span class="at">:root</span> {
-    --bg:      <span class="st">#0f1117</span>;   <span class="cm">/* page background */</span>
-    --panel:   <span class="st">#1a1d27</span>;   <span class="cm">/* cards and tables */</span>
-    --accent:  <span class="st">#4f8cff</span>;   <span class="cm">/* buttons, links, highlights */</span>
-    --border:  <span class="st">#2d3748</span>;   <span class="cm">/* dividers */</span>
-    --muted:   <span class="st">#98a2b3</span>;   <span class="cm">/* secondary text */</span>
+    --bg:      <span class="st">#f5f6f8</span>;   <span class="cm">/* page background (light grey) */</span>
+    --panel:   <span class="st">#ffffff</span>;   <span class="cm">/* cards and surfaces */</span>
+    --accent:  <span class="st">#2f6fe0</span>;   <span class="cm">/* primary action / active nav */</span>
+    --border:  <span class="st">#e4e7ec</span>;   <span class="cm">/* dividers */</span>
+    --text:    <span class="st">#1a1d23</span>;   <span class="cm">/* near-black body text */</span>
+    --muted:   <span class="st">#667085</span>;   <span class="cm">/* secondary text */</span>
 }</pre>
 </div>
 
@@ -1164,27 +1327,28 @@ Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">"Adde
     <div style="color:#e2e8f0; line-height:2">
 Browser <span style="color:#82aaff">→ fetch('/stats/summary')</span> &nbsp;&nbsp;&nbsp;&nbsp;→ 4 totals for stat cards<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#82aaff">→ fetch('/stats/weekly-mileage')</span> → bar chart<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#82aaff">→ fetch('/stats/pace-trend')</span> &nbsp;&nbsp;&nbsp;→ pace line (Y inverted)<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#82aaff">→ fetch('/stats/hr-trend')</span> &nbsp;&nbsp;&nbsp;&nbsp;→ HR line<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#82aaff">→ fetch('/stats/training-load?sport=running')</span><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> weekly TRIMP bars (runs only)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#546e7a">→</span> rolling ACWR line + 0.8–1.3 safe band<br>
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color:#82aaff">→ fetch('/stats/prs')</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ fastest 5k / 10k / HM / marathon<br>
 <span style="color:#546e7a">(Cycling tab fetches the parallel <span style="color:#82aaff">/stats/cycling/*</span> set instead)</span><br>
 Chart.js <span style="color:#c3e88d">renders all charts simultaneously</span>
     </div>
   </div>
 
-  <h3>When you generate a Weekly Plan</h3>
+  <h3>When you save a plan from the coach chat</h3>
   <div class="arch">
     <div style="color:#e2e8f0; line-height:2">
-Browser <span style="color:#546e7a">→</span> <span style="color:#82aaff">POST /plans/generate</span><br>
-&nbsp;&nbsp;<span style="color:#546e7a">→</span> fetch stats + recent runs + goals from PostgreSQL<br>
+You agree a week with the coach in the chat, then click <span style="color:#7ad9a4">Save this week's plan</span><br>
+Browser <span style="color:#546e7a">→</span> <span style="color:#82aaff">POST /plans/from-coach</span><br>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> read the coach's <span style="color:#c3e88d">most recent message</span> (coach chat channel)<br>
 &nbsp;&nbsp;<span style="color:#546e7a">→</span> <span style="color:#c39bd3">Anthropic Claude API</span> (claude-opus-4-7)<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;system: "You are an expert running coach. Athlete stats: ..."<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user: "Generate a 7-day plan as JSON"<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;user: "convert this free-text plan into the 7-day JSON schema"<br>
 &nbsp;&nbsp;<span style="color:#546e7a">←</span> Claude returns JSON with 7 workout days<br>
-&nbsp;&nbsp;<span style="color:#546e7a">→</span> validate JSON has exactly 7 days<br>
-&nbsp;&nbsp;<span style="color:#546e7a">→</span> store in weekly_plans table (status='proposed')<br>
-&nbsp;&nbsp;<span style="color:#546e7a">→</span> render as HTML day-cards<br>
-Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">7 coloured workout cards with Accept / Regenerate / Archive buttons</span>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> validate (exactly 7 days)<br>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> archive previous plan · store new (source='chat', status='accepted')<br>
+&nbsp;&nbsp;<span style="color:#546e7a">→</span> render as the Mon–Sun calendar<br>
+Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">the agreed week, shown directly below the conversation</span>
     </div>
   </div>
 </div>
@@ -1204,21 +1368,23 @@ Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">7 col
 │ &nbsp;&nbsp;├── <span class="file">main.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># FastAPI app entry point — mounts all routers</span><br>
 │ &nbsp;&nbsp;├── <span class="file">config.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># loads .env, exposes DATABASE_URL, API keys, paths</span><br>
 │ &nbsp;&nbsp;├── <span class="file">db.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># ALL database functions: schema, upsert, queries</span><br>
-│ &nbsp;&nbsp;├── <span class="file">csv_importer.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># multi-locale Garmin CSV parser + importer</span><br>
-│ &nbsp;&nbsp;├── <span class="file">garmin_playwright.py</span> &nbsp; <span class="note"># browser automation: activities + sleep + calories</span><br>
-│ &nbsp;&nbsp;├── <span class="file">sleep_importer.py</span> &nbsp;&nbsp;&nbsp; <span class="note"># parses weekly + 1-day Greek sleep CSVs</span><br>
-│ &nbsp;&nbsp;├── <span class="file">calories_importer.py</span> &nbsp; <span class="note"># parses the scraped calories-burned table</span><br>
+│ &nbsp;&nbsp;├── <span class="file">garmin_api.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># CURRENT sync: Garmin JSON API (sleep · activities · calories)</span><br>
+│ &nbsp;&nbsp;├── <span class="file">csv_importer.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># multi-locale Garmin CSV parser (manual Import CSV)</span><br>
+│ &nbsp;&nbsp;├── <span class="file">garmin_playwright.py</span> &nbsp; <span class="note"># legacy browser automation (fallback)</span><br>
+│ &nbsp;&nbsp;├── <span class="file">sleep_importer.py</span> &nbsp;&nbsp;&nbsp; <span class="note"># legacy: parses weekly + 1-day Greek sleep CSVs</span><br>
+│ &nbsp;&nbsp;├── <span class="file">calories_importer.py</span> &nbsp; <span class="note"># legacy: parses the scraped calories-burned table</span><br>
 │ &nbsp;&nbsp;├── <span class="file">greek_dates.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># shared Greek month/date parsing helpers</span><br>
-│ &nbsp;&nbsp;├── <span class="file">coach.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># holistic coach: tool-use agent + persona loader</span><br>
-│ &nbsp;&nbsp;├── <span class="file">nutrition.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># nutrition agent: food library + log tools + vision</span><br>
-│ &nbsp;&nbsp;├── <span class="file">sync.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># legacy API sync (kept but unused)</span><br>
+│ &nbsp;&nbsp;├── <span class="file">agent.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># shared Claude tool-use loop (coach + nutrition)</span><br>
+│ &nbsp;&nbsp;├── <span class="file">coach.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># holistic coach: tools + persona (Opus 4.7)</span><br>
+│ &nbsp;&nbsp;├── <span class="file">training_load.py</span> &nbsp;&nbsp;&nbsp; <span class="note"># TRIMP + ACWR maths (shared by chart + coach)</span><br>
+│ &nbsp;&nbsp;├── <span class="file">nutrition.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># nutrition agent: food library + log + vision (Sonnet 4.6)</span><br>
 │ &nbsp;&nbsp;└── <span class="dir">routes/</span><br>
-│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">activities.py</span> &nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /sync (both) /sync/running /import/csv</span><br>
-│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">stats.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /stats/* running + cycling + sleep + calories + nutrition</span><br>
-│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">plans.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /plans/* — AI generate + paste→calendar parse</span><br>
+│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">activities.py</span> &nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /sync, /sync/running, /sync/sleep(/weekly), /sync/calories, /import/csv</span><br>
+│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">stats.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /stats/* — today, energy-balance, training-load, running, cycling, sleep, calories, nutrition</span><br>
+│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">plans.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /plans/* — save the agreed plan from chat → calendar</span><br>
 │ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">goals.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /goals/* — CRUD for race targets</span><br>
 │ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">nutrition.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /food — agent chat (text+photo) + today's totals</span><br>
-│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="file">chat.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /chat — streaming AI coaching conversation</span><br>
+│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="file">chat.py</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># /chat — one coach chat turn (calls coach.chat)</span><br>
 ├── <span class="file">coach_persona.md</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># plain-English coach preferences (edit to steer it)</span><br>
 ├── <span class="dir">frontend/</span><br>
 │ &nbsp;&nbsp;└── <span class="file">index.html</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span class="note"># entire UI — all CSS, HTML, JS in one file</span><br>
@@ -1277,7 +1443,7 @@ Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">7 col
     <tr>
       <td><strong>Claude API</strong></td>
       <td>AI engine</td>
-      <td>Best reasoning for coaching context; streaming API makes chat feel live; tool-use lets the coach &amp; nutrition agents query the DB; vision reads food photos; structured JSON output for plans is reliable</td>
+      <td>Best reasoning for coaching context; tool-use lets the coach &amp; nutrition agents query the DB on demand; vision reads food photos; structured JSON output for plans is reliable; per-agent models (Opus 4.7 coach, Sonnet 4.6 nutrition) balance depth vs speed</td>
     </tr>
     <tr>
       <td><strong>Pillow</strong></td>
@@ -1373,12 +1539,21 @@ Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">7 col
     long-term backdrop (so the page isn't empty while nightly data accrues from today).
   </p>
 
-  <h3>Keeping it current</h3>
+  <h3>Keeping it current — two sync buttons</h3>
   <p>
-    Sleep is synced on demand with the <strong>Sync Sleep</strong> button on the tab: it opens the
-    browser, exports the most recent night (1-day view), and imports it — the same scraper + parser
-    described above. The weekly backdrop is a periodic snapshot; re-running the 1-year export
-    refreshes it.
+    The Sleep tab has <strong>two</strong> sync buttons, one per export shape, because they fill
+    different tables:
+  </p>
+  <ul>
+    <li><strong>Sync Sleep</strong> → <code>POST /sync/sleep</code> — exports the most recent night
+      (1-day view) and imports the rich per-night detail into <code>sleep_nights</code>.</li>
+    <li><strong>Sync Sleep History</strong> → <code>POST /sync/sleep/weekly</code> — exports the
+      1-year view (weekly averages) and refreshes the long-term backdrop in <code>sleep_weeks</code>.
+      This is the multi-month history that predates per-night tracking.</li>
+  </ul>
+  <p>
+    Both reuse the same Playwright session and parser machinery; they differ only in which range tab
+    the scraper clicks before exporting (the export format follows the selected view).
   </p>
 </div>
 
@@ -1420,9 +1595,10 @@ Browser <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">7 col
   <h3>Calories eaten — the nutrition agent</h3>
   <p>
     A <strong>second, separate</strong> Claude tool-use agent (<code>nutrition.py</code>, its own
-    <code>food</code> chat channel) lets you log what you ate in plain language — by text or by
-    photo. The whole point: reduce each day to <strong>four numbers</strong> — calories, protein,
-    fat, carbs — stored as daily totals.
+    <code>food</code> chat channel, running on the faster <strong>Sonnet 4.6</strong>) lets you log
+    what you ate in plain language — by text or by photo. The whole point: reduce each day to
+    <strong>four numbers</strong> — calories, protein, fat, carbs — stored as daily totals. It shares
+    the same tool-use loop as the coach (§7), just with its own tools and model.
   </p>
 
   <div class="callout blue">
@@ -1478,9 +1654,473 @@ Agent <span style="color:#546e7a">←</span> <span style="color:#7ad9a4">"Logged
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════════════════════════════
+     14 — THE TODAY DASHBOARD
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num purple">14</div>
+    <h2>The Today Dashboard — Integrated Metrics</h2>
+  </div>
+
+  <p>
+    Every other tab answers one question about one domain. <strong>Today</strong> is the screen that
+    reads <em>across</em> all of them — the only place that joins running, cycling, sleep, calories
+    burned and food eaten into single answers. Each computed view below has its own <code>/stats</code>
+    endpoint and is refetched on every visit.
+  </p>
+
+  <h3>Readiness</h3>
+  <p>
+    The lead card surfaces last night's sleep score, duration and HRV (from <code>sleep_nights</code>),
+    colour-coded good / fair / low — a one-glance "should I go hard today?" read.
+  </p>
+
+  <h3>Energy balance — eaten vs burned</h3>
+  <p>
+    <code>GET /stats/energy-balance</code> joins the day's <strong>eaten</strong> calories (summed from
+    <code>food_log</code>) with <strong>burned</strong> calories (the <code>calories</code> table) to
+    give a daily <em>net</em>: negative = deficit (losing), positive = surplus (gaining). It renders as
+    a diverging bar chart (deficit green, surplus red), anchored on the days you actually logged food,
+    with each bar's eaten/burned breakdown on hover. A day with no Calories sync returns
+    <code>null</code> instead of a misleading number,
+    so it reads "pending" rather than a fake deficit. The running 7-day net is converted to an
+    approximate fat change (7,700 kcal ≈ 1 kg).
+  </p>
+
+  <h3>Training load &amp; recovery</h3>
+  <p>
+    The standout: <code>GET /stats/training-load</code> turns every run and ride into one comparable
+    <strong>load</strong> number using <strong>Banister TRIMP</strong> — duration weighted by
+    heart-rate intensity, so a hard hour counts far more than an easy one and the two sports finally
+    share a single scale.
+  </p>
+
+  <div class="code-label">backend/training_load.py — TRIMP per session</div>
+  <pre>HRr   = (avg_hr − resting_hr) / (max_hr − resting_hr)   <span class="cm"># 0–1 intensity</span>
+TRIMP = duration_min × HRr × <span class="nm">0.64</span> × e^(<span class="nm">1.92</span> × HRr)
+
+<span class="cm"># resting_hr ← averaged from recent sleep nights</span>
+<span class="cm"># max_hr     ← the highest value ever recorded</span></pre>
+
+  <p>
+    Weekly load is stacked by sport (run + ride) and overlaid with the <strong>HRV</strong> recovery
+    line from sleep on a second axis — the "are you absorbing your training?" picture: load climbing
+    while HRV falls is the warning sign. Above the chart sits the <strong>acute : chronic workload
+    ratio (ACWR)</strong> — this week's load ÷ the 4-week average — flagged green in the 0.8–1.3 sweet
+    spot and red past 1.5, the classic overtraining / injury signal.
+  </p>
+
+  <div class="callout blue">
+    <span class="callout-icon">🏃</span>
+    <div>
+      <strong>One engine, three consumers.</strong> The same
+      <code>training_load.compute()</code> serves all of them, so the numbers can never disagree:
+      <ul style="margin:0.4rem 0 0 1rem">
+        <li><strong>Today</strong> — no sport filter → the <em>combined</em> run + ride load (the
+          systemic stress the body actually feels).</li>
+        <li><strong>Running tab</strong> — <code>?sport=running</code> → running-only TRIMP bars plus a
+          <em>rolling ACWR</em> line (each week's load ÷ the mean of its previous 4 weeks) drawn against
+          the 0.8–1.3 band. This replaced the old pace and heart-rate trend charts.</li>
+        <li><strong>The coach</strong> — via its <code>get_training_load</code> tool (§7).</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="callout orange">
+    <span class="callout-icon">⚠️</span>
+    <div>
+      <strong>Estimated inputs.</strong> TRIMP needs a max HR and a resting HR. The app estimates max
+      HR from the highest value ever recorded (an underestimate if you've never truly maxed out) and
+      resting HR from your sleep data. Absolute load values are therefore approximate — but the
+      <em>trend</em> and the ACWR ratio hold regardless.
+    </div>
+  </div>
+
+  <div class="callout blue">
+    <span class="callout-icon">📅</span>
+    <div>
+      <strong>The week starts Sunday.</strong> Every weekly bucket in the app — mileage, distance,
+      load, efficiency trends — starts on <strong>Sunday</strong> to match the Garmin watch. Postgres'
+      <code>DATE_TRUNC('week', …)</code> is hard-wired to Monday, so the app shifts the date +1 day,
+      truncates, then steps back 1 day: a Sunday-aligned bucket from a Monday-only function. One Python
+      helper (<code>_week_start</code>) and one SQL constant keep all six weekly aggregations in lockstep.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     15 — SCIENTIFIC BASIS
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num dark">15</div>
+    <h2>Scientific Basis — Why These Formulas</h2>
+  </div>
+
+  <p>
+    The training-load metrics (§14) aren't invented — they're established sports-science models. This
+    section documents the reasoning and the references, so the choices are defensible rather than
+    arbitrary.
+  </p>
+
+  <h3>Training load — Banister TRIMP</h3>
+  <p>
+    The goal is to turn a session into a single <strong>stress dose</strong>: not "how far" but "how
+    much did this tax the body?" Two inputs drive that — <em>how long</em> and <em>how hard</em> — and
+    TRIMP (TRaining IMPulse) combines them.
+  </p>
+
+  <p><strong>Intensity — heart-rate reserve (HRr).</strong> Hardness is measured relative to the
+    individual using the <strong>Karvonen</strong> heart-rate-reserve method: the heart's usable band
+    runs from resting to max, and HRr asks where the session's average sat within it.</p>
+
+  <div class="code-label">HRr — Karvonen heart-rate reserve (0–1)</div>
+  <pre>HRr = (avg_hr − resting_hr) / (max_hr − resting_hr)</pre>
+
+  <p>
+    Using the <em>reserve</em> (not <code>avg_hr / max_hr</code>) makes it personal — it accounts for
+    both the floor and the ceiling, so HRr = 0.5 means the same relative effort for any athlete.
+  </p>
+
+  <div class="code-label">Banister TRIMP — the stress dose</div>
+  <pre>TRIMP = duration × HRr × <span class="nm">0.64</span> × e^(<span class="nm">1.92</span> × HRr)</pre>
+
+  <p>
+    The term <code>0.64 · e^(1.92·HRr)</code> is an <strong>exponential weighting</strong> that makes
+    hard time count disproportionately more. The justification is physiological: blood-lactate
+    accumulation (and the metabolic/hormonal strain it tracks) rises <em>exponentially</em>, not
+    linearly, with intensity. Banister fitted that exact curve to the lactate response, so the formula
+    encodes how a real body's stress accelerates as you push harder. The constants are empirical and
+    sex-specific: <strong>0.64 &amp; 1.92 for men</strong>, 0.86 &amp; 1.67 for women.
+  </p>
+
+  <div class="callout blue">
+    <span class="callout-icon">🧮</span>
+    <div>
+      <strong>Worked example</strong> (resting HR 48, max HR 204 → a 156-bpm reserve). The same
+      <strong>60 minutes</strong>, two intensities:
+      <table style="margin-top:0.6rem">
+        <tr><th>Session</th><th>avg HR</th><th>HRr</th><th>TRIMP</th></tr>
+        <tr><td>Easy hour</td><td>120</td><td>0.46</td><td>≈ 43</td></tr>
+        <tr><td>Hard hour</td><td>175</td><td>0.81</td><td>≈ 149</td></tr>
+      </table>
+      Identical duration, but the hard hour is <strong>~3.5× the load</strong> — exactly why TRIMP
+      beats "time" or "distance" as a stress measure. Each session's TRIMP is summed per Sunday-week,
+      split run vs ride.
+    </div>
+  </div>
+
+  <h3>Overtraining risk — acute : chronic workload ratio (ACWR)</h3>
+  <div class="code-label">ACWR</div>
+  <pre>ACWR = this week's load ÷ 4-week average weekly load
+       = acute (fatigue) ÷ chronic (fitness)</pre>
+  <p>
+    The key insight, from <strong>Gabbett's</strong> "training–injury prevention paradox": injury risk
+    is driven less by <em>how much</em> you train than by <em>how fast you change it</em> relative to
+    what you're adapted to. A high chronic base is protective; a sudden spike is dangerous. The
+    thresholds the app uses come straight from that work:
+  </p>
+  <table>
+    <tr><th>ACWR</th><th>Zone</th><th>Meaning</th></tr>
+    <tr><td>&lt; 0.8</td><td>low</td><td>Detraining / returning from a break</td></tr>
+    <tr><td>0.8 – 1.3</td><td><strong>optimal</strong></td><td>The sweet spot — building safely</td></tr>
+    <tr><td>1.3 – 1.5</td><td>high</td><td>Caution — load running ahead of base</td></tr>
+    <tr><td>&gt; 1.5</td><td>very high</td><td>Sharp injury / overtraining risk — pull back</td></tr>
+  </table>
+
+  <h3>Recovery — HRV</h3>
+  <p>
+    HRV (heart-rate variability, the beat-to-beat variation measured overnight, rMSSD-based) is a
+    validated marker of <strong>parasympathetic</strong> (recovery) activity. Higher = better
+    recovered; a downward trend signals accumulated fatigue, poor sleep, or illness. The app reads it
+    <em>against</em> load (Plews et al.): rising load + falling HRV is the strongest "back off" signal,
+    because each confirms the other from a different direction.
+  </p>
+
+  <div class="callout orange">
+    <span class="callout-icon">⚠️</span>
+    <div>
+      <strong>Honest simplifications.</strong> The Garmin CSV gives only per-session <em>averages</em>,
+      not the second-by-second heart-rate stream — so this is <strong>session-average TRIMP</strong>,
+      not the more precise zone-weighted or per-beat variant. Max HR is estimated from the highest
+      value ever recorded (an underestimate if never truly maxed), and resting HR is averaged from
+      sleep. Absolute load values are therefore approximate; the <em>trend</em> and the <em>ACWR
+      ratio</em> are the trustworthy outputs.
+    </div>
+  </div>
+
+  <div class="callout green">
+    <span class="callout-icon">💾</span>
+    <div>
+      <strong>Where these numbers live.</strong> TRIMP and ACWR are <em>not stored</em> — there is no
+      load table. They're <strong>derived</strong>, recomputed on demand in
+      <code>backend/training_load.py</code> from the raw rows that <em>are</em> stored: activities with
+      heart rate (<code>activities</code>) and resting HR / HRV (<code>sleep_nights</code>). That one
+      module is shared by the Today chart (<code>GET /stats/training-load</code>) and the coach's
+      <code>get_training_load</code> tool, so the dashboard and the AI read identical figures.
+    </div>
+  </div>
+
+  <h3>References</h3>
+  <ul style="font-size:0.86rem; line-height:1.7">
+    <li>Banister EW. <em>Modeling elite athletic performance.</em> In: Physiological Testing of the High-Performance Athlete, 1991. — TRIMP &amp; the lactate-weighted impulse.</li>
+    <li>Morton RH, Fitz-Clarke JR, Banister EW. <em>Modeling human performance in running.</em> J Appl Physiol, 1990;69(3):1171–77. — the impulse–response model.</li>
+    <li>Gabbett TJ. <em>The training–injury prevention paradox.</em> Br J Sports Med, 2016;50(5):273–80. — ACWR &amp; the 0.8–1.3 sweet spot.</li>
+    <li>Karvonen MJ, Kentala E, Mustala O. <em>The effects of training on heart rate.</em> Ann Med Exp Biol Fenn, 1957;35(3):307–15. — heart-rate reserve.</li>
+    <li>Plews DJ, et al. <em>Training adaptation and heart rate variability in elite endurance athletes.</em> Sports Med, 2013;43(9):773–81. — HRV for monitoring recovery.</li>
+  </ul>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     16 — THE MCP COACH
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num teal">16</div>
+    <h2>The MCP Coach — Chatting With Your Data</h2>
+  </div>
+
+  <p>
+    The in-app coach (§7) calls the <strong>paid Anthropic API</strong> once per message. To get the
+    same data-grounded coaching for a <strong>flat subscription fee instead of per-message cost</strong>,
+    the app also exposes your data to the ordinary <strong>Claude Desktop chat</strong> through a local
+    <strong>MCP server</strong>.
+  </p>
+
+  <div class="callout blue">
+    <span class="callout-icon">🔌</span>
+    <div>
+      <strong>What is MCP?</strong> The <em>Model Context Protocol</em> is an open standard for giving an
+      AI assistant access to outside data and actions. The assistant itself has no hands — it can only
+      produce text. An MCP server runs on your machine and offers a set of <strong>tools</strong>
+      (named functions, each with a description). The assistant decides when to call a tool, the server
+      runs it and returns the result, and the assistant grounds its answer in that result. Here the tools
+      are read-only queries against your local Garmin database.
+    </div>
+  </div>
+
+  <h3>The server — <code>mcp_coach.py</code></h3>
+  <p>
+    A small local server registered in Claude Desktop's <code>claude_desktop_config.json</code> under
+    <code>mcpServers</code>. Claude Desktop starts it on launch and talks to it over
+    <strong>stdin/stdout</strong> — there is no network port and nothing is exposed online. It reuses the
+    in-app coach's own data functions (<code>backend.coach._run_tool</code>), so the two never drift apart,
+    and it only needs the local PostgreSQL running (independent of the web app).
+  </p>
+
+  <div class="code-label">mcp_coach.py — a tool is just a described function</div>
+  <pre>server = <span class="fn">MCPServer</span>(<span class="st">"garmin-coach"</span>, instructions=COACHING_CONTEXT)
+
+<span class="fn">@server.tool()</span>
+<span class="kw">def</span> <span class="fn">training_load</span>() -> <span class="cl">str</span>:
+    <span class="st">"""Weekly TRIMP load + the ACWR overtraining ratio, with HRV and resting HR."""</span>
+    <span class="kw">return</span> coach.<span class="fn">_run_tool</span>(<span class="st">"get_training_load"</span>, {})
+
+<span class="cm"># … and run it over stdio</span>
+server.<span class="fn">run</span>(<span class="st">"stdio"</span>)</pre>
+
+  <h3>The tools it offers</h3>
+  <table class="tech-table">
+    <thead><tr><th>Tool</th><th>Returns</th></tr></thead>
+    <tbody>
+      <tr><td><code>recent_runs</code> / <code>recent_cycling</code></td><td>activities with pace/speed, HR, VO2max, calories</td></tr>
+      <tr><td><code>recent_sleep</code></td><td>score, stages, HRV, resting HR, respiration, stress</td></tr>
+      <tr><td><code>recent_calories</code> / <code>recent_nutrition</code></td><td>daily burned (active/resting) and eaten (kcal + macros)</td></tr>
+      <tr><td><code>training_load</code></td><td>weekly TRIMP load + ACWR + HRV/resting-HR trend</td></tr>
+      <tr><td><code>goals</code> / <code>pr_progression</code></td><td>active race goals; how times at a distance have progressed</td></tr>
+      <tr><td><code>speed_workouts</code></td><td>the track/interval library + current-fitness paces (from <code>data/speed_library.json</code>)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout green">
+    <span class="callout-icon">🔒</span>
+    <div>
+      <strong>Read-only and local.</strong> The tools only read the database — the chat cannot change
+      anything. Everything stays on the machine; no data is sent anywhere beyond the normal Claude chat.
+      New tools appear in the chat only after Claude Desktop is <strong>restarted</strong> (servers load at
+      startup).
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     17 — THE WEEKLY FITNESS REPORT
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num indigo">17</div>
+    <h2>The Weekly Fitness Report — Automation</h2>
+  </div>
+
+  <p>
+    Every <strong>Sunday ~10:00</strong> a multi-page PDF lands in the Downloads folder:
+    <strong>Overview</strong> · <strong>Weekly Review</strong> (recovery, nutrition, and a detailed running
+    <em>progression</em> analysis + a goal-driven coaching verdict) · the <strong>detailed Monday–Saturday
+    plan</strong> (warm-up / main / cool-down with adaptive HRV gates) · <strong>Sleep</strong> ·
+    <strong>Nutrition</strong> — all built from the local database, with the written analysis and plan produced
+    on the <strong>subscription</strong> (no API cost).
+  </p>
+
+  <div class="callout blue">
+    <span class="callout-icon">📅</span>
+    <div>
+      <strong>The running week is Monday–Saturday.</strong> Saturday is the long run and <strong>Sunday is the
+      day off</strong> (and the day the report runs). So the Sunday report reviews the Monday–Saturday that just
+      finished and plans the next Monday–Saturday (six training days).
+    </div>
+  </div>
+
+  <h3>The hybrid design — charts by code, words by Claude</h3>
+  <p>
+    A background script can draw charts but can't write insightful coaching; a chat can reason but can't
+    reliably render a polished PDF. So the two are split:
+  </p>
+  <ul style="font-size:0.9rem; line-height:1.7">
+    <li><code>fitness_report.py</code> — a Python generator that reads the database, draws every infographic
+      (training-load bars, HRV trend, the <strong>aerobic-efficiency</strong> trend, sleep stages, burned-vs-eaten,
+      macros) with native vector drawing (<code>fpdf2</code>, no heavy chart library), and renders the pages.</li>
+    <li><code>data/report_ai.json</code> — the written half: the verdict, the per-page feedback, the
+      progression commentary + comparison table, and the structured plan. The generator renders whatever this
+      file holds (with a rule-based fallback if it is missing).</li>
+  </ul>
+
+  <div class="callout green">
+    <span class="callout-icon">📈</span>
+    <div>
+      <strong>Progression analysis.</strong> The heart of the Weekly Review. It draws an app-style
+      <strong>Aerobic Efficiency Trend</strong> — one faint dot per run plus a bold weekly-average line over the
+      full history, where efficiency = <code>speed&nbsp;(km/h) ÷ HR × 100</code> (higher = fitter at the same
+      effort). Below it, a <strong>comparison table</strong> matches this week's runs to comparable past runs
+      (same distance / HR) with colour-coded verdicts, and a written breakdown judges endurance, speed and
+      VO2max separately. A flat efficiency line while under-fuelling reads as fatigue, not lost fitness.
+    </div>
+  </div>
+
+  <div class="callout orange">
+    <span class="callout-icon">🎯</span>
+    <div>
+      <strong>Every report is one step closer to the goal.</strong> A <em>"Toward your goals"</em> section gives
+      a verdict on whether the week's runs were good or bad <em>relative to the goal trajectory</em> (the Nov&nbsp;15
+      5k and Dec&nbsp;20 half), states where the athlete stands versus each target, sets the next concrete
+      targets, and the plan is <strong>adjusted from the measured progression</strong> — progress the stimulus
+      when efficiency and paces improve, consolidate when HRV, fuel or ACWR say to. This guiding principle is
+      written into the scheduled task's own instructions.
+    </div>
+  </div>
+
+  <div class="callout purple">
+    <span class="callout-icon">🏋️</span>
+    <div>
+      <strong>The weekly training template — 3 quality runs + 2 strength + recomp nutrition.</strong>
+      The athlete's goals, in priority order, are baked into every plan: <strong>(1)</strong> get faster (5k first),
+      <strong>(2)</strong> build the distance into the half, <strong>(3)</strong> lose fat and add some muscle for a
+      leaner, athletic physique (a <em>recomposition</em>, not bodybuilding). The six training days follow a fixed,
+      evidence-based shape:
+      <ul style="font-size:0.9rem; line-height:1.7; margin:0.5rem 0 0">
+        <li><strong>Mon</strong> easy recovery · <strong>Tue</strong> track Q1 (5k/VO2) ·
+          <strong>Wed</strong> easy · <strong>Thu</strong> track Q2 (10k/threshold) ·
+          <strong>Fri</strong> easy / cross-train · <strong>Sat</strong> long run with a <em>progressing</em>
+          half-marathon-pace block (which replaces a stand-alone tempo and grows ~3&nbsp;km → 8–10&nbsp;km over the weeks).
+          Max <strong>three</strong> quality run days, spaced ~48&nbsp;h; <strong>Sunday</strong> is the only full rest.</li>
+        <li><strong>Two runner-strength sessions</strong>, placed on the hard-run days so the easy days and Sunday stay
+          true recovery (minimising concurrent-training interference): <strong>Tue</strong> heavy lower body + plyometrics
+          (power &amp; running economy), <strong>Thu</strong> upper body + posterior chain (the athletic build). Heavy,
+          low-rep, never to failure — not hypertrophy "pump" work. No third lifting day; <strong>Fri carries no lifting</strong>
+          to keep the legs fresh for Saturday.</li>
+        <li><strong>Nutrition is a gentle, periodised deficit</strong> — not "eat more everywhere". The three hard days are
+          fuelled at maintenance-plus (carbs around the session); the easy days hold a modest ~300–500&nbsp;kcal deficit;
+          protein stays near <strong>~2&nbsp;g/kg</strong> every day. That drives slow fat loss (~0.25–0.4&nbsp;kg/week) while
+          speed keeps climbing — a larger deficit would cost the 5k before it costs the scale.</li>
+      </ul>
+      Volume targets 60–70&nbsp;km but ramps ≤~10%/week, with a recovery week roughly every fourth or whenever ACWR&nbsp;&gt;~1.4
+      or HRV is suppressed. The whole template is encoded in the scheduled task's instructions, so every Sunday report
+      reproduces it automatically.
+    </div>
+  </div>
+
+  <h3>The scheduled run</h3>
+  <p>
+    A <strong>Claude Desktop scheduled task</strong> ("weekly-fitness-report", cron <code>0 10 * * 0</code>)
+    starts a fresh subscription session each Sunday that does the whole flow end to end:
+  </p>
+  <div class="code-label">What the Sunday session does</div>
+  <pre><span class="cm"># 1. pull the week's data via the MCP tools (§16)</span>
+training_load · recent_runs · recent_sleep · recent_calories · recent_nutrition · goals · speed_workouts
+
+<span class="cm"># 2. write the analysis + detailed plan, periodised toward the races,</span>
+<span class="cm">#    ROTATING which track workouts it prescribes week to week</span>
+→ data/report_ai.json
+
+<span class="cm"># 3. render the PDF</span>
+.venv\Scripts\python.exe fitness_report.py  →  "fitness report - week of &lt;Monday&gt;.pdf"  →  Downloads</pre>
+
+  <div class="callout orange">
+    <span class="callout-icon">⏳</span>
+    <div>
+      <strong>It runs on the subscription, so it needs Claude Desktop open</strong> at the scheduled time
+      (it catches up on next launch otherwise). That is the trade-off for zero API cost. The workout library
+      is <em>not</em> printed in the report — it lives in <code>data/speed_library.json</code> for the coach
+      (§16) to draw variety from.
+    </div>
+  </div>
+
+  <div class="callout blue">
+    <span class="callout-icon">🗂️</span>
+    <div>
+      <strong>Supersedes the one-pager.</strong> This replaces the earlier rule-based
+      <code>weekly_schedule.py</code> + its headless Windows Task Scheduler job, which is now disabled. Each day
+      block is measured and <strong>kept together</strong> so a session never splits across a page (no blank
+      pages), and the generator logs a warning if the AI content is malformed or the page count looks wrong.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     18 — DESKTOP LAUNCH & POLISH
+════════════════════════════════════════════════════════════════════ -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-num pink">18</div>
+    <h2>Desktop Launch &amp; Polish</h2>
+  </div>
+
+  <p>
+    The app is launched by <code>start_app.bat</code>, which starts the uvicorn server and opens it in a clean
+    Edge/Chrome <em>app window</em>. Two small fixes make that feel like a real desktop app.
+  </p>
+
+  <h3>Wait for the server before opening the browser</h3>
+  <p>
+    The launcher used to open the browser on a blind <code>timeout /t 3</code>. But uvicorn with
+    <code>--reload</code> plus the database pool often needs longer than three seconds, so the browser arrived
+    first and showed <code>ERR_CONNECTION_REFUSED</code> (and a stray <code>cmd</code> window flashed up to do the
+    opening). Now a tiny hidden helper, <code>scripts/open_when_ready.ps1</code>, <strong>polls port 8000 and
+    opens the browser only once the server actually answers</strong> — no race, no refused page, no extra window.
+  </p>
+  <div class="code-label">start_app.bat — launch the opener hidden; it waits for the port</div>
+  <pre><span class="cm">:: opens the browser only once the server is listening (polls :8000), runs hidden</span>
+start "" /b powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden ^
+      -File "%~dp0scripts\open_when_ready.ps1"
+
+.venv\Scripts\python.exe -m uvicorn backend.main:app --reload</pre>
+
+  <h3>A real app icon, not the generic globe</h3>
+  <p>
+    An Edge/Chrome app-mode window takes its taskbar icon from the page's favicon. The page had none, so Windows
+    showed a generic globe. The app now serves the existing runner icon at <code>/favicon.ico</code> and links it
+    in the page head, so the tab and the taskbar window show the runner. (Chrome/Edge cache the app-window icon,
+    so it updates on the next launch.)
+  </p>
+  <div class="code-label">backend/main.py — serve the icon</div>
+  <pre><span class="fn">@app.get</span>(<span class="st">"/favicon.ico"</span>, include_in_schema=<span class="kw">False</span>)
+<span class="kw">def</span> <span class="fn">favicon</span>() -> <span class="cl">FileResponse</span>:
+    <span class="kw">return</span> <span class="fn">FileResponse</span>(<span class="st">"assets/runner.ico"</span>, media_type=<span class="st">"image/x-icon"</span>)</pre>
+</div>
+
 <!-- footer -->
 <div style="text-align:center; color:#aaa; font-size:0.8rem; padding: 2rem 0 1rem; border-top: 1px solid #eef0f6; margin-top: 2rem;">
-  Garmin Coach · Technical Documentation · June 2026 · Nikanoras Papadopoulos
+  Garmin Coach · Technical Documentation · October 2026 · Nikanoras Papadopoulos
 </div>
 
 </div><!-- /page -->

@@ -3,21 +3,23 @@
 <head>
   <meta charset="utf-8" />
   <title>Garmin Coach</title>
+  <link rel="icon" href="/favicon.ico" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css">
   <style>
     /* ── Tokens ─────────────────────────────────────────────────────────── */
     :root {
-      --bg:      #0f1115;
-      --panel:   #161a22;
-      --border:  #262b36;
-      --text:    #e6e8eb;
-      --muted:   #98a2b3;
-      --accent:  #4f8cff;
+      --bg:      #f5f6f8;
+      --panel:   #ffffff;
+      --border:  #e4e7ec;
+      --text:    #1a1d23;
+      --muted:   #667085;
+      --accent:  #2f6fe0;
       --green:   #1f8a4c;
-      --red:     #b53b3b;
+      --red:     #c0392b;
       --orange:  #d97706;
       --purple:  #7c3aed;
       --radius:  8px;
@@ -28,44 +30,54 @@
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       background: var(--bg);
       color: var(--text);
+      color-scheme: light;
       min-height: 100vh;
       padding-bottom: 0;
     }
 
-    /* ── Header ─────────────────────────────────────────────────────────── */
-    header {
+    /* ── App shell ──────────────────────────────────────────────────────── */
+    .app-shell { display: flex; align-items: flex-start; min-height: 100vh; }
+
+    /* ── Sidebar ────────────────────────────────────────────────────────── */
+    .sidebar {
       position: sticky;
       top: 0;
-      z-index: 50;
+      flex-shrink: 0;
+      width: 196px;
+      height: 100vh;
       background: var(--panel);
-      border-bottom: 1px solid var(--border);
-      padding: 0 1.5rem;
+      border-right: 1px solid var(--border);
+      padding: 1rem 0.7rem;
       display: flex;
-      align-items: center;
-      gap: 2rem;
-      height: 56px;
+      flex-direction: column;
+      overflow-y: auto;
     }
-    .logo { font-size: 1.05rem; font-weight: 700; white-space: nowrap; }
+    .logo { font-size: 1.05rem; font-weight: 700; white-space: nowrap; padding: 0.4rem 0.6rem 1rem; }
     .logo span { color: var(--accent); }
 
-    /* Desktop tabs */
-    .desktop-tabs { display: flex; gap: 2px; }
-    .tab-btn {
+    .side-nav { display: flex; flex-direction: column; gap: 2px; }
+    .side-tab {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      width: 100%;
       background: none;
       border: none;
       color: var(--muted);
-      padding: 0.45rem 0.9rem;
+      padding: 0.55rem 0.7rem;
       border-radius: var(--radius);
-      font-size: 0.88rem;
+      font-size: 0.9rem;
       font-weight: 500;
       cursor: pointer;
+      text-align: left;
       transition: color 0.15s, background 0.15s;
     }
-    .tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.05); }
-    .tab-btn.active { color: var(--accent); background: rgba(79,140,255,0.12); }
+    .side-tab:hover { color: var(--text); background: rgba(0,0,0,0.05); }
+    .side-tab.active { color: var(--accent); background: rgba(79,140,255,0.12); }
+    .side-icon { font-size: 1.1rem; width: 1.4rem; text-align: center; line-height: 1; }
 
     /* ── Main layout ─────────────────────────────────────────────────────── */
-    main { max-width: 1200px; margin: 0 auto; padding: 1.75rem 1.5rem; }
+    main { flex: 1; min-width: 0; max-width: 1100px; margin: 0 auto; padding: 1.75rem 2rem; }
     .tab-panel { display: block; }
     .tab-panel[hidden] { display: none; }
 
@@ -90,9 +102,9 @@
     .btn-danger  { background: var(--red); }
     .btn-success { background: var(--green); }
     .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
-    .btn-outline:hover:not(:disabled) { background: rgba(255,255,255,0.05); filter: none; }
+    .btn-outline:hover:not(:disabled) { background: rgba(0,0,0,0.05); filter: none; }
     .btn-ghost   { background: transparent; color: var(--muted); }
-    .btn-ghost:hover:not(:disabled)   { color: var(--text); background: rgba(255,255,255,0.04); filter: none; }
+    .btn-ghost:hover:not(:disabled)   { color: var(--text); background: rgba(0,0,0,0.06); filter: none; }
 
     /* ── Forms ───────────────────────────────────────────────────────────── */
     select, input[type="text"], input[type="date"], textarea {
@@ -124,8 +136,8 @@
       margin-bottom: 0.9rem;
       font-size: 0.88rem;
     }
-    .banner.success { background: rgba(31,138,76,0.12); color: #7ad9a4; border: 1px solid rgba(31,138,76,0.3); }
-    .banner.error   { background: rgba(181,59,59,0.12); color: #ff9a9a; border: 1px solid rgba(181,59,59,0.3); }
+    .banner.success { background: rgba(31,138,76,0.10); color: #197544; border: 1px solid rgba(31,138,76,0.28); }
+    .banner.error   { background: rgba(192,57,43,0.10);  color: #b02a1a; border: 1px solid rgba(192,57,43,0.28); }
 
     .section-heading {
       font-size: 0.78rem;
@@ -144,8 +156,8 @@
     }
 
     /* ── Spinner ─────────────────────────────────────────────────────────── */
-    #plan-spinner, #parse-spinner { display: none; }
-    #plan-spinner.htmx-request, #parse-spinner.htmx-request {
+    #coach-plan-spinner { display: none; }
+    #coach-plan-spinner.htmx-request {
       display: inline-flex;
       align-items: center;
       gap: 0.6rem;
@@ -161,6 +173,28 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     .htmx-request .btn { opacity: 0.55; cursor: progress; }
+
+    /* ── Coach: this week's plan ─────────────────────────────────────────── */
+    /* ── Coach: body weight & calorie check ─────────────────────────────── */
+    .weight-form { display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; margin:0.8rem 0 0.4rem; }
+    .weight-form input[type=number] { width:9rem; }
+    .weight-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:0.55rem; margin-top:0.55rem; }
+    .weight-stat { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:0.65rem 0.75rem; }
+    .weight-stat .v { font-size:1.35rem; font-weight:700; line-height:1; }
+    .weight-stat .l { font-size:0.64rem; text-transform:uppercase; letter-spacing:0.04em; color:var(--muted); margin-top:0.35rem; }
+    .weight-validate { margin-top:0.7rem; border-radius:var(--radius); padding:0.7rem 0.85rem; font-size:0.88rem; line-height:1.5; border:1px solid var(--border); background:var(--bg); }
+    .weight-validate .vt { font-weight:700; display:block; margin-bottom:0.2rem; }
+    .weight-validate.ok    { background:#edfbf3; border-color:#bfe6cf; color:#1a5c35; }
+    .weight-validate.over  { background:#fff8ec; border-color:#f1dcae; color:#7a4f0a; }
+    .weight-validate.under { background:#eff5ff; border-color:#cfe0ff; color:#2c4a8a; }
+    @media (max-width:560px){ .weight-stats{ grid-template-columns:repeat(2,1fr); } }
+
+    .coach-plan-section { margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
+    .coach-plan-head { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .coach-plan-head h3 {
+      font-size: 0.78rem; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.07em; margin-right: auto;
+    }
 
     /* ── Dashboard: stat cards ────────────────────────────────────────────── */
     .stat-cards {
@@ -183,6 +217,62 @@
       margin-bottom: 0.35rem;
     }
     .stat-label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+    /* ── Today dashboard ─────────────────────────────────────────────────── */
+    .today-head { margin-bottom: 1.25rem; }
+    .today-head h2 { font-size: 1.45rem; font-weight: 700; letter-spacing: -0.02em; }
+    .today-date { color: var(--muted); font-size: 0.85rem; margin-top: 0.25rem; }
+
+    .today-hero {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.9rem;
+      margin-bottom: 0.9rem;
+    }
+    .hero-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.25rem;
+    }
+    .hero-label {
+      display: flex; align-items: center; gap: 0.45rem;
+      font-size: 0.74rem; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: 0.85rem;
+    }
+    .hero-main { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+    .hero-value { font-size: 2rem; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+    .hero-unit  { font-size: 0.85rem; color: var(--muted); }
+    .hero-sub   { font-size: 0.82rem; color: var(--muted); margin-top: 0.65rem; line-height: 1.4; }
+    .hero-pill  {
+      display: inline-flex; align-items: center;
+      font-size: 0.72rem; font-weight: 600;
+      padding: 0.12rem 0.55rem; border-radius: 999px;
+    }
+    .badge-type {
+      display: inline-block; font-size: 0.72rem; font-weight: 700;
+      padding: 0.15rem 0.6rem; border-radius: var(--radius);
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .tone-good { color: #1f8a4c; }
+    .tone-warn { color: #c2740a; }
+    .tone-bad  { color: #c0392b; }
+
+    /* ── Today: energy balance ───────────────────────────────────────────── */
+    .balance-section { margin-top: 1.5rem; }
+    .balance-head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 1rem; flex-wrap: wrap; margin-bottom: 0.5rem;
+    }
+    .balance-head h3 {
+      font-size: 0.78rem; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.07em;
+    }
+    .balance-summary { font-size: 0.85rem; color: var(--muted); }
+    .balance-summary strong { color: var(--text); font-weight: 700; }
+    .balance-legend { display: flex; gap: 1.1rem; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.7rem; }
+    .balance-legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
 
     /* ── Dashboard: charts ───────────────────────────────────────────────── */
     .charts-grid {
@@ -209,7 +299,7 @@
     /* ── PR cards ────────────────────────────────────────────────────────── */
     .pr-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
     .pr-card {
-      background: rgba(255,255,255,0.025);
+      background: rgba(0,0,0,0.03);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 0.85rem;
@@ -252,7 +342,7 @@
     table { width: 100%; border-collapse: collapse; font-size: 0.88rem; white-space: nowrap; }
     th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border); }
     th { color: var(--muted); font-weight: 500; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.05em; }
-    tbody tr:hover { background: rgba(255,255,255,0.025); }
+    tbody tr:hover { background: rgba(0,0,0,0.03); }
 
     /* ── Goals ────────────────────────────────────────────────────────────── */
     .goal-form { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1rem; }
@@ -264,7 +354,7 @@
       flex-wrap: wrap;
       gap: 0.5rem;
       padding: 0.7rem 1rem;
-      background: rgba(255,255,255,0.02);
+      background: rgba(0,0,0,0.025);
       border: 1px solid var(--border);
       border-radius: var(--radius);
     }
@@ -287,14 +377,66 @@
       background: var(--panel); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 0.7rem 1rem; margin-bottom: 0.9rem;
     }
-    .today-macros .tm-kcal { font-size: 1.15rem; font-weight: 700; color: #f5a623; }
+    .today-macros .tm-kcal { font-size: 1.15rem; font-weight: 700; color: #c2740a; }
     .today-macros .tm-macro { font-size: 0.9rem; font-weight: 600; color: var(--text); }
     .today-macros .tm-items { font-size: 0.78rem; color: var(--muted); margin-left: auto; }
+
+    /* ── Food: date bar + quick-log form + items ─────────────────────────── */
+    .food-datebar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.9rem; flex-wrap: wrap; }
+    .food-datebar input[type="date"] { height: 34px; }
+    .food-datebar .food-date-label { font-size: 0.85rem; font-weight: 700; color: var(--accent); margin-left: 0.3rem; }
+    .food-log-form { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+    .food-log-form select { flex: 1; min-width: 200px; height: 40px; }
+    .del-food-form select { height: 40px; min-width: 220px; border: 1px solid var(--border); border-radius: var(--radius); padding: 0 0.6rem; background: var(--panel); color: var(--text); }
+    .food-log-form .grams-wrap { position: relative; }
+    .food-log-form input[type="number"] { width: 104px; height: 40px; padding-right: 1.6rem; text-align: right; }
+    .food-log-form .grams-wrap::after {
+      content: 'g'; position: absolute; right: 0.65rem; top: 50%; transform: translateY(-50%);
+      color: var(--muted); font-size: 0.85rem; pointer-events: none;
+    }
+    .food-log-form .btn { height: 40px; }
+    .food-preview { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
+    .food-log-status { flex-basis: 100%; font-size: 0.85rem; font-weight: 600; min-height: 1.1em; }
+    .food-log-status .food-ok  { color: #1f8a4c; }
+    .food-log-status .food-err { color: var(--red); }
+
+    #food-items { padding: 0.35rem 0.9rem; }
+    .food-item {
+      display: flex; align-items: center; gap: 0.9rem;
+      padding: 0.62rem 0.35rem; border-bottom: 1px solid var(--border); font-size: 0.88rem;
+      border-radius: var(--radius); transition: background 0.12s;
+    }
+    .food-item:last-child { border-bottom: none; }
+    .food-item:hover { background: rgba(0,0,0,0.025); }
+    .food-item .fi-name   { font-weight: 600; flex: 1; min-width: 0; text-transform: capitalize;
+                            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .food-item .fi-grams  { color: var(--muted); width: 52px; text-align: right; }
+    .food-item .fi-kcal   { color: #c2740a; font-weight: 700; width: 76px; text-align: right; }
+    .food-item .fi-macros { color: var(--muted); font-size: 0.8rem; width: 152px; text-align: right; letter-spacing: 0.01em; }
+    .food-item .fi-del {
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      font-size: 1.2rem; line-height: 1; width: 26px; height: 26px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; transition: all 0.12s;
+    }
+    .food-item .fi-del:hover { color: #fff; background: var(--red); }
+    .food-ai > summary { cursor: pointer; font-size: 0.88rem; color: var(--accent); font-weight: 600; padding: 0.3rem 0; }
+    .new-food-form .nf-grid { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+    .nf-field { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.68rem; color: var(--muted); }
+    .nf-field span { text-transform: uppercase; letter-spacing: 0.03em; font-weight: 700; }
+    .nf-field em { text-transform: none; font-style: normal; font-weight: 400; opacity: 0.7; }
+    .nf-field input { width: 92px; padding: 0.45rem 0.55rem; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.9rem; color: var(--text); background: var(--panel); }
+    .nf-field.nf-name { flex: 1 1 180px; }
+    .nf-field.nf-name input { width: 100%; }
+    @media (max-width: 560px) {
+      .food-item .fi-macros { display: none; }
+      .nf-field input { width: 84px; }
+      .nf-field.nf-name { flex-basis: 100%; }
+    }
     .msg { padding: 0.65rem 0.9rem; border-radius: var(--radius); line-height: 1.55; }
     .msg-role { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.25rem; }
     .msg-body { font-size: 0.92rem; white-space: pre-wrap; }
     .msg-user      { background: rgba(79,140,255,0.08); border: 1px solid rgba(79,140,255,0.22); align-self: flex-end; max-width: 82%; }
-    .msg-assistant { background: rgba(255,255,255,0.03); border: 1px solid var(--border); align-self: flex-start; max-width: 92%; }
+    .msg-assistant { background: rgba(0,0,0,0.03); border: 1px solid var(--border); align-self: flex-start; max-width: 92%; }
     .chat-form { display: flex; gap: 0.6rem; margin-top: 0.75rem; align-items: flex-end; }
     .chat-form textarea {
       flex: 1; min-height: 58px; resize: vertical;
@@ -303,91 +445,6 @@
       padding: 0.55rem 0.7rem; font-size: 0.92rem; font-family: inherit;
     }
 
-    /* ── Training plan cards ─────────────────────────────────────────────── */
-    .plan-card {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1.25rem;
-      margin-bottom: 1.25rem;
-    }
-    .plan-card.plan-accepted { border-color: rgba(31,138,76,0.45); }
-    .plan-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      flex-wrap: wrap;
-      gap: 0.9rem;
-      margin-bottom: 1.1rem;
-    }
-    .plan-week   { font-size: 1.05rem; font-weight: 700; }
-    .plan-summary{ color: var(--muted); font-size: 0.88rem; margin-top: 0.25rem; }
-    .plan-total  { color: var(--accent); font-size: 0.82rem; font-weight: 600; margin-top: 0.25rem; }
-    .plan-actions{ display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
-    .status-badge {
-      display: inline-block;
-      padding: 0.28rem 0.7rem;
-      border-radius: 20px;
-      font-size: 0.76rem;
-      font-weight: 600;
-    }
-    .status-proposed { background: rgba(79,140,255,0.12); color: var(--accent); }
-    .status-accepted { background: rgba(31,138,76,0.15); color: #7ad9a4; }
-
-    /* 7-day grid */
-    .days-grid {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 0.55rem;
-    }
-    .day-card {
-      background: rgba(255,255,255,0.02);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 0.8rem 0.75rem;
-      min-width: 0;
-    }
-    .day-header { display: flex; flex-direction: column; margin-bottom: 0.45rem; }
-    .day-name { font-weight: 600; font-size: 0.82rem; }
-    .day-date { font-size: 0.7rem; color: var(--muted); }
-    .workout-badge {
-      display: inline-block;
-      padding: 0.18rem 0.45rem;
-      border-radius: 4px;
-      font-size: 0.68rem;
-      font-weight: 600;
-      margin-bottom: 0.45rem;
-    }
-    .day-title { font-weight: 600; font-size: 0.82rem; margin-bottom: 0.3rem; }
-    .day-desc  { color: var(--muted); font-size: 0.76rem; line-height: 1.4; }
-    .day-meta  { color: var(--accent); font-size: 0.74rem; font-weight: 600; margin-top: 0.35rem; }
-
-    /* ── Paste-a-plan section (Activities) ───────────────────────────────── */
-    .plan-paste {
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 1.2rem 1.4rem;
-      margin: 1.2rem 0;
-    }
-    .plan-paste h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.25rem; }
-    .plan-paste p  { color: var(--muted); font-size: 0.8rem; margin-bottom: 0.9rem; line-height: 1.5; }
-    .plan-paste textarea {
-      width: 100%;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      color: var(--text);
-      padding: 0.7rem 0.85rem;
-      font-family: inherit;
-      font-size: 0.85rem;
-      line-height: 1.5;
-      resize: vertical;
-    }
-    .plan-paste textarea:focus { outline: none; border-color: var(--accent); }
-    .plan-paste-actions {
-      display: flex; align-items: center; gap: 0.9rem; margin-top: 0.75rem;
-    }
 
     /* ── Plan calendar (7-day grid) ──────────────────────────────────────── */
     .cal-wrap {
@@ -413,7 +470,7 @@
       gap: 0.5rem;
     }
     .cal-cell {
-      background: rgba(255,255,255,0.02);
+      background: rgba(0,0,0,0.025);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 0.7rem 0.6rem;
@@ -438,12 +495,12 @@
 
     /* ── Responsive ──────────────────────────────────────────────────────── */
     @media (max-width: 1050px) {
-      .days-grid { grid-template-columns: repeat(4, 1fr); }
       .cal-grid  { grid-template-columns: repeat(4, 1fr); }
     }
     @media (max-width: 767px) {
-      /* Show mobile nav, hide desktop tabs */
-      .desktop-tabs { display: none; }
+      /* Show mobile nav, hide the sidebar; shell becomes a single column */
+      .app-shell { display: block; }
+      .sidebar { display: none; }
       .mobile-nav {
         display: flex;
         position: fixed;
@@ -451,9 +508,12 @@
         background: var(--panel);
         border-top: 1px solid var(--border);
         z-index: 100;
-        justify-content: space-around;
-        padding: 0.3rem 0 0.5rem;
+        justify-content: flex-start;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 0.3rem 0.2rem 0.5rem;
       }
+      .mobile-nav::-webkit-scrollbar { display: none; }
       .mobile-tab {
         display: flex;
         flex-direction: column;
@@ -465,7 +525,8 @@
         font-size: 0.65rem;
         font-weight: 500;
         cursor: pointer;
-        min-width: 52px;
+        flex: 0 0 auto;
+        min-width: 56px;
         border-radius: var(--radius);
         transition: color 0.15s;
       }
@@ -473,50 +534,125 @@
       .mobile-icon { font-size: 1.2rem; line-height: 1.2; margin-bottom: 0.15rem; }
 
       body { padding-bottom: 72px; }
-      main { padding: 1rem; }
-      header { padding: 0 1rem; gap: 1rem; }
+      main { padding: 1rem; max-width: none; }
 
       /* Stat cards: 2x2 */
       .stat-cards { grid-template-columns: repeat(2, 1fr); }
       /* Charts: single column */
       .charts-grid { grid-template-columns: 1fr; }
-      /* Days grid: 2 columns */
-      .days-grid { grid-template-columns: repeat(2, 1fr); }
+      /* Calendar: 2 columns */
       .cal-grid  { grid-template-columns: repeat(2, 1fr); }
       /* Goal form stacks */
       .goal-form { flex-direction: column; align-items: stretch; }
       /* Chat form stacks */
       .chat-form { flex-direction: column; }
       .chat-form .btn { align-self: flex-end; }
-      /* Plan actions wrap */
-      .plan-header { flex-direction: column; }
     }
     @media (max-width: 480px) {
       .stat-value { font-size: 1.4rem; }
-      .days-grid { grid-template-columns: 1fr; }
       .cal-grid  { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
 
-<!-- ── Header ──────────────────────────────────────────────────────────── -->
-<header>
-  <div class="logo">&#127939; Garmin <span>Coach</span></div>
-  <nav class="desktop-tabs">
-    <button class="tab-btn active" data-tab="dashboard">Running</button>
-    <button class="tab-btn" data-tab="cycling">Cycling</button>
-    <button class="tab-btn" data-tab="sleep">Sleep</button>
-    <button class="tab-btn" data-tab="calories">Calories</button>
-    <button class="tab-btn" data-tab="plan">Training Plan</button>
-    <button class="tab-btn" data-tab="goals">Goals</button>
-    <button class="tab-btn" data-tab="coach">Coach</button>
-    <button class="tab-btn" data-tab="food">Food</button>
+<!-- ── App shell: sidebar + main ───────────────────────────────────────── -->
+<div class="app-shell">
+
+<!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+<aside class="sidebar">
+  <div class="logo"><i class="ti ti-activity-heartbeat" aria-hidden="true"></i> Garmin <span>Coach</span></div>
+  <nav class="side-nav">
+    <button class="side-tab active" data-tab="today"><span class="side-icon"><i class="ti ti-layout-dashboard" aria-hidden="true"></i></span><span>Today</span></button>
+    <button class="side-tab" data-tab="dashboard"><span class="side-icon"><i class="ti ti-run" aria-hidden="true"></i></span><span>Running</span></button>
+    <button class="side-tab" data-tab="cycling"><span class="side-icon"><i class="ti ti-bike" aria-hidden="true"></i></span><span>Cycling</span></button>
+    <button class="side-tab" data-tab="sleep"><span class="side-icon"><i class="ti ti-moon" aria-hidden="true"></i></span><span>Sleep</span></button>
+    <button class="side-tab" data-tab="calories"><span class="side-icon"><i class="ti ti-flame" aria-hidden="true"></i></span><span>Calories</span></button>
+    <button class="side-tab" data-tab="food"><span class="side-icon"><i class="ti ti-salad" aria-hidden="true"></i></span><span>Food</span></button>
+    <button class="side-tab" data-tab="goals"><span class="side-icon"><i class="ti ti-target" aria-hidden="true"></i></span><span>Goals</span></button>
+    <button class="side-tab" data-tab="coach"><span class="side-icon"><i class="ti ti-scale" aria-hidden="true"></i></span><span>Calibration</span></button>
   </nav>
-</header>
+</aside>
 
 <!-- ── Main ────────────────────────────────────────────────────────────── -->
 <main>
+
+  <!-- ── Today (overview) ───────────────────────────────────────────────── -->
+  <div id="panel-today" class="tab-panel">
+    <div class="today-head">
+      <h2>Today</h2>
+      <div class="today-date" id="today-date">—</div>
+    </div>
+
+    <div class="today-hero">
+      <div class="hero-card">
+        <div class="hero-label"><i class="ti ti-moon" style="font-size:1rem" aria-hidden="true"></i> Readiness</div>
+        <div class="hero-main">
+          <span class="hero-value" id="today-readiness">—</span>
+          <span class="hero-pill" id="today-readiness-tag"></span>
+        </div>
+        <div class="hero-sub" id="today-readiness-sub">Loading…</div>
+      </div>
+
+      <div class="hero-card">
+        <div class="hero-label"><i class="ti ti-calendar" style="font-size:1rem" aria-hidden="true"></i> Planned today</div>
+        <div class="hero-main">
+          <span class="hero-value" id="today-plan-title" style="font-size:1.35rem">—</span>
+        </div>
+        <div class="hero-sub" id="today-plan-sub">Loading…</div>
+      </div>
+
+      <div class="hero-card">
+        <div class="hero-label"><i class="ti ti-scale" style="font-size:1rem" aria-hidden="true"></i> Energy balance</div>
+        <div class="hero-main">
+          <span class="hero-value" id="today-balance">—</span>
+          <span class="hero-unit">kcal</span>
+        </div>
+        <div class="hero-sub" id="today-energy-sub">Loading…</div>
+      </div>
+    </div>
+
+    <div class="stat-cards">
+      <div class="stat-card"><div class="stat-value" id="today-weekkm">—</div><div class="stat-label">This Week</div></div>
+      <div class="stat-card"><div class="stat-value" id="today-protein">—</div><div class="stat-label">Protein Today</div></div>
+      <div class="stat-card"><div class="stat-value" id="today-rhr">—</div><div class="stat-label">Resting HR</div></div>
+      <div class="stat-card"><div class="stat-value" id="today-vo2">—</div><div class="stat-label">VO&#8322;max</div></div>
+    </div>
+
+    <div class="balance-section">
+      <div class="balance-head">
+        <h3>Energy Balance <span style="font-weight:400;text-transform:none;letter-spacing:0">(eaten &minus; burned)</span></h3>
+        <span class="balance-summary" id="balance-summary">—</span>
+      </div>
+      <div class="balance-legend">
+        <span><span class="dot" style="background:#1f8a4c"></span>Deficit (losing)</span>
+        <span><span class="dot" style="background:#c0392b"></span>Surplus (gaining)</span>
+      </div>
+      <div class="chart-card">
+        <canvas id="chart-balance"></canvas>
+      </div>
+    </div>
+
+    <div class="balance-section">
+      <div class="balance-head">
+        <h3>Training Load &amp; Recovery <span style="font-weight:400;text-transform:none;letter-spacing:0">(HR load · runs + rides vs recovery)</span></h3>
+        <span class="balance-summary" id="load-summary">—</span>
+      </div>
+      <div class="balance-legend">
+        <span><span class="dot" style="background:#2f6fe0"></span>Run load</span>
+        <span><span class="dot" style="background:#9b59b6"></span>Ride load</span>
+        <span><span class="dot" style="background:#17a2b8"></span>HRV (recovery)</span>
+      </div>
+      <div class="chart-card">
+        <canvas id="chart-load"></canvas>
+      </div>
+    </div>
+
+    <div class="toolbar" style="margin-top:1.25rem">
+      <button class="btn btn-outline" onclick="showTab('coach')">Calibration &#8594;</button>
+      <button class="btn btn-ghost" onclick="showTab('food')">Log food</button>
+    </div>
+  </div>
 
   <!-- ── Running (Dashboard) ────────────────────────────────────────────── -->
   <div id="panel-dashboard" class="tab-panel">
@@ -570,16 +706,22 @@
         <canvas id="chart-mileage"></canvas>
       </div>
       <div class="chart-card">
-        <h3>Pace Trend <span style="font-weight:400;text-transform:none;letter-spacing:0">(lower = faster)</span></h3>
-        <canvas id="chart-pace"></canvas>
+        <h3>Running Load <span style="font-weight:400;text-transform:none;letter-spacing:0">(weekly TRIMP — runs only)</span></h3>
+        <div class="balance-legend" style="margin-bottom:0.5rem">
+          <span><span class="dot" style="background:rgba(47,111,224,0.7)"></span>Weekly load</span>
+          <span><span class="dot" style="background:#667085"></span>4-wk baseline</span>
+          <span><span class="dot" style="background:rgba(31,138,76,0.3)"></span>Safe ramp 0.8–1.3×</span>
+          <span style="opacity:0.75">faded bar = in progress</span>
+        </div>
+        <canvas id="chart-run-load"></canvas>
       </div>
       <div class="chart-card">
         <h3>Personal Records</h3>
         <div id="pr-cards"><div class="empty" style="padding:0.5rem">Loading…</div></div>
       </div>
       <div class="chart-card">
-        <h3>Heart Rate Trend <span style="font-weight:400;text-transform:none;letter-spacing:0">(lower = fitter)</span></h3>
-        <canvas id="chart-hr"></canvas>
+        <h3>ACWR <span style="font-weight:400;text-transform:none;letter-spacing:0">(acute ÷ chronic · 0.8–1.3 = safe)</span></h3>
+        <canvas id="chart-run-acwr"></canvas>
       </div>
     </div>
   </div>
@@ -643,6 +785,10 @@
         <h3>Heart Rate Trend <span style="font-weight:400;text-transform:none;letter-spacing:0">(lower = fitter)</span></h3>
         <canvas id="chart-cyc-hr"></canvas>
       </div>
+      <div class="chart-card">
+        <h3>Aerobic Efficiency <span style="font-weight:400;text-transform:none;letter-spacing:0">(speed ÷ HR · higher = fitter)</span></h3>
+        <canvas id="chart-cyc-aerobic"></canvas>
+      </div>
     </div>
   </div>
 
@@ -655,6 +801,13 @@
               hx-indicator="this"
               title="Exports last night's detailed sleep from Garmin. Opens a browser — log in if prompted.">
         Sync Sleep
+      </button>
+      <button class="btn btn-outline"
+              hx-post="/sync/sleep/weekly"
+              hx-target="#sync-status-sleep"
+              hx-indicator="this"
+              title="Exports the 1-year sleep view (weekly averages) — the long-term backdrop. Opens a browser — log in if prompted.">
+        Sync Sleep History
       </button>
     </div>
     <div id="sync-status-sleep"></div>
@@ -709,6 +862,10 @@
         <h3>Bedtime &amp; Wake <span style="font-weight:400;text-transform:none;letter-spacing:0">(weekly)</span></h3>
         <canvas id="chart-slp-timing"></canvas>
       </div>
+      <div class="chart-card">
+        <h3>HRV Recovery Baseline <span style="font-weight:400;text-transform:none;letter-spacing:0">(weekly avg · higher = better recovered)</span></h3>
+        <canvas id="chart-slp-hrv"></canvas>
+      </div>
     </div>
   </div>
 
@@ -739,8 +896,8 @@
         <div class="stat-label">Avg Resting</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value" id="cal-days">—</div>
-        <div class="stat-label">Days Tracked</div>
+        <div class="stat-value" id="cal-intake">—</div>
+        <div class="stat-label">Avg Intake (food)</div>
       </div>
     </div>
 
@@ -753,56 +910,6 @@
         <h3>Total Calories <span style="font-weight:400;text-transform:none;letter-spacing:0">(per day)</span></h3>
         <canvas id="chart-cal-total"></canvas>
       </div>
-    </div>
-  </div>
-
-  <!-- ── Training Plan ──────────────────────────────────────────────────── -->
-  <div id="panel-plan" class="tab-panel" hidden>
-
-    <!-- Paste a plan from the coach → calendar -->
-    <div class="plan-paste">
-      <h3>Paste a plan from your coach</h3>
-      <p>Copy the training plan the AI coach gave you in the chat, paste it below,
-         and it will be turned into a clean weekly calendar — and saved here.</p>
-      <form hx-post="/plans/parse"
-            hx-target="#plan-calendar"
-            hx-indicator="#parse-spinner"
-            hx-on::after-request="if(event.detail.successful) this.reset()">
-        <textarea name="plan_text" rows="6"
-                  placeholder="e.g.&#10;Monday: Easy 6 km at 6:00/km, HR under 145&#10;Tuesday: Rest&#10;Wednesday: 5×800m intervals…"></textarea>
-        <div class="plan-paste-actions">
-          <button class="btn" type="submit">&#10024; Visualize &amp; Save</button>
-          <span id="parse-spinner">
-            <span class="spinner-ring"></span>
-            Reading your plan… ~15 seconds
-          </span>
-        </div>
-      </form>
-    </div>
-
-    <div id="plan-calendar"
-         hx-get="/plans/calendar"
-         hx-trigger="load">
-      <div class="empty">Loading…</div>
-    </div>
-
-    <!-- Or auto-generate a plan from your data -->
-    <div class="toolbar" style="margin-top:2rem">
-      <button class="btn btn-outline"
-              hx-post="/plans/generate"
-              hx-target="#plans-panel"
-              hx-indicator="#plan-spinner">
-        &#10024; Or auto-generate from my data
-      </button>
-      <div id="plan-spinner">
-        <span class="spinner-ring"></span>
-        Generating your plan… this takes ~20 seconds
-      </div>
-    </div>
-    <div id="plans-panel"
-         hx-get="/plans"
-         hx-trigger="load">
-      <div class="empty">Loading…</div>
     </div>
   </div>
 
@@ -858,111 +965,227 @@
 
   <!-- ── Coach ──────────────────────────────────────────────────────────── -->
   <div id="panel-coach" class="tab-panel" hidden>
-    <div id="chat-history"
-         class="panel"
-         hx-get="/chat/history"
-         hx-trigger="load">
-      <div class="empty">Loading…</div>
+
+    <!-- Body weight & calorie validation ─────────────────────────────────── -->
+    <div class="panel" id="weight-panel" style="margin-bottom:1rem">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:0.75rem;flex-wrap:wrap">
+        <h3 style="margin:0">Body weight &amp; calorie check</h3>
+        <span style="font-size:0.72rem;color:var(--muted)">log daily · 7-day average vs last week · validates the deficit</span>
+      </div>
+      <form class="weight-form"
+            hx-post="/weight/log" hx-target="#weight-banner" hx-swap="innerHTML"
+            hx-on::after-request="if(event.detail.successful){this.querySelector('[name=weight_kg]').value='';}">
+        <input type="date" id="weight-date" name="day" required>
+        <input type="number" name="weight_kg" step="0.1" min="30" max="300" placeholder="weight (kg)" required>
+        <button class="btn btn-small" type="submit">Log weight</button>
+      </form>
+      <div id="weight-banner"></div>
+      <div id="weight-stats" class="weight-stats"><div class="empty" style="grid-column:1/-1">Loading…</div></div>
+      <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;margin-top:0.95rem">
+        <strong style="font-size:0.9rem">Body composition</strong>
+        <form style="display:flex;gap:0.4rem;align-items:center"
+              hx-post="/weight/bodyfat" hx-target="#weight-banner" hx-swap="innerHTML">
+          <label style="font-size:0.78rem;color:var(--muted)">Body fat %</label>
+          <input type="number" name="bodyfat" id="bodyfat-input" step="0.1" min="1" max="60" style="width:5.5rem">
+          <button class="btn btn-small btn-ghost" type="submit">Update</button>
+        </form>
+        <div style="display:flex;gap:0.4rem;align-items:center;flex-wrap:wrap">
+          <span style="font-size:0.78rem;color:var(--muted)">Activity &times;</span>
+          <button class="btn btn-small" id="af-auto-btn" type="button"
+                  hx-post="/weight/activity-mode" hx-vals='{"mode":"dynamic"}'
+                  hx-target="#weight-banner" hx-swap="innerHTML"
+                  title="Derive the multiplier from Garmin's measured burn">Auto</button>
+          <form style="display:flex;gap:0.3rem;align-items:center"
+                hx-post="/weight/activity" hx-target="#weight-banner" hx-swap="innerHTML">
+            <input type="number" name="activity" id="activity-input" step="0.005" min="1.2" max="2" style="width:4.6rem" placeholder="1.725">
+            <button class="btn btn-small btn-ghost" type="submit">Manual</button>
+          </form>
+        </div>
+      </div>
+      <div id="comp-stats" style="margin-top:0.5rem"></div>
+
+      <div id="weight-validate"></div>
+      <div class="chart-card" style="margin-top:0.8rem">
+        <div style="height:170px"><canvas id="chart-weight"></canvas></div>
+      </div>
     </div>
-    <form class="chat-form"
-          hx-post="/chat"
-          hx-target="#chat-history"
-          hx-swap="beforeend scroll:bottom"
-          hx-disabled-elt="find button, find textarea"
-          hx-on::after-request="this.reset();
-            document.getElementById('chat-history').scrollTop=99999">
-      <textarea name="message"
-                placeholder="Ask about your training, request a weekly plan, check your pace trends…"
-                required></textarea>
-      <button class="btn" type="submit">Send</button>
-    </form>
-    <div style="margin-top:0.5rem">
-      <button class="btn btn-small btn-danger"
-              hx-post="/chat/clear"
-              hx-target="#chat-history"
-              hx-confirm="Clear all chat history?">Clear chat</button>
-    </div>
+
   </div>
 
   <!-- ── Food (Nutrition) ───────────────────────────────────────────────── -->
   <div id="panel-food" class="tab-panel" hidden>
-    <div id="food-today" class="today-macros"
-         hx-get="/food/today" hx-trigger="load"></div>
+    <div class="food-datebar">
+      <button type="button" class="btn btn-outline btn-small" onclick="stepFoodDate(-1)" title="Previous day">&lsaquo;</button>
+      <input type="date" id="food-date" onchange="onFoodDateChange()">
+      <button type="button" class="btn btn-outline btn-small" onclick="stepFoodDate(1)" title="Next day">&rsaquo;</button>
+      <button type="button" class="btn btn-ghost btn-small" onclick="setFoodDate(todayISO())">Today</button>
+      <span class="food-date-label" id="food-date-label"></span>
+    </div>
+    <div id="food-today" class="today-macros"></div>
+
     <div class="chart-card" style="margin-bottom:0.9rem">
-      <h3>Daily Macros <span style="font-weight:400;text-transform:none;letter-spacing:0">(grams · protein / carbs / fat — calories on top)</span></h3>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:0.75rem">
+        <h3 style="margin:0">Daily Macros <span style="font-weight:400;text-transform:none;letter-spacing:0">(grams · protein / carbs / fat — calories on top)</span></h3>
+        <div style="text-align:right;line-height:1.15;white-space:nowrap">
+          <span style="display:block;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--muted)">14-day avg</span>
+          <span id="macros-avg14" style="font-size:1.05rem;font-weight:700;color:#c2740a">—</span>
+        </div>
+      </div>
       <canvas id="chart-nutrition"></canvas>
     </div>
-    <div id="food-history"
-         class="panel"
-         hx-get="/food/history"
-         hx-trigger="load">
+
+    <!-- Quick log: pick a food + grams — computed locally, no API -->
+    <div class="panel">
+      <div class="section-heading">Log food</div>
+      <form class="food-log-form"
+            hx-post="/food/log"
+            hx-target="#food-items"
+            hx-on::after-request="if(event.detail.successful){this.grams.value='';foodPreview();}">
+        <input type="hidden" name="day" id="food-log-day">
+        <select name="food_name" id="food-select" required onchange="foodPreview()">
+          <option value="" disabled selected>Select a food…</option>
+        </select>
+        <span class="grams-wrap">
+          <input type="number" name="grams" id="food-grams" min="1" step="1"
+                 placeholder="0" oninput="foodPreview()" required>
+        </span>
+        <button class="btn" type="submit">Add</button>
+        <span id="food-preview" class="food-preview"></span>
+      </form>
+    </div>
+
+    <!-- Entries for the selected day — delete a row to deduct it -->
+    <div id="food-items" class="panel" style="margin-top:0.9rem">
       <div class="empty">Loading…</div>
     </div>
-    <form class="chat-form"
-          hx-post="/food"
-          hx-encoding="multipart/form-data"
-          hx-target="#food-history"
-          hx-swap="beforeend scroll:bottom"
-          hx-disabled-elt="find button, find textarea"
-          hx-on::after-request="this.reset();
-            this.querySelector('.food-photo-name').textContent='';
-            document.getElementById('food-history').scrollTop=99999;
-            if (event.detail.successful) initFood();">
-      <textarea name="message"
-                placeholder="Tell me what you ate (e.g. '200g chicken, 150g rice') — or attach a photo"></textarea>
-      <label title="Attach a food photo"
-             style="cursor:pointer;padding:0.5rem 0.7rem;background:var(--panel);
-                    border:1px solid var(--border);border-radius:var(--radius);font-size:1.1rem">
-        📷
-        <input type="file" name="photo" accept="image/*" style="display:none"
-               onchange="this.closest('form').querySelector('.food-photo-name').textContent=this.files[0]?this.files[0].name:''">
-      </label>
-      <span class="food-photo-name" style="font-size:0.74rem;color:var(--muted);align-self:center"></span>
-      <button class="btn" type="submit">Log</button>
-    </form>
-    <div style="margin-top:0.5rem">
-      <button class="btn btn-small btn-danger"
-              hx-post="/food/clear"
-              hx-target="#food-history"
-              hx-confirm="Clear food chat? (Your logged food data stays.)">Clear chat</button>
-    </div>
+
+    <!-- Manual add — name + per-100g macros, no API cost -->
+    <details class="food-ai" style="margin-top:1.5rem" open>
+      <summary>Add a new ingredient manually <span style="color:var(--muted);font-weight:400">(no API — you type the numbers)</span></summary>
+      <form class="new-food-form panel" style="margin-top:0.6rem"
+            hx-post="/food/new"
+            hx-target="#new-food-status"
+            hx-on::after-request="if(event.detail.successful){loadFoodOptions();this.reset();}">
+        <div class="nf-grid">
+          <label class="nf-field nf-name">
+            <span>Name</span>
+            <input type="text" name="name" placeholder="e.g. greek yogurt 2%" required>
+          </label>
+          <label class="nf-field">
+            <span>Protein <em>/100g</em></span>
+            <input type="number" name="protein" min="0" step="0.1" placeholder="0">
+          </label>
+          <label class="nf-field">
+            <span>Carbs <em>/100g</em></span>
+            <input type="number" name="carbs" min="0" step="0.1" placeholder="0">
+          </label>
+          <label class="nf-field">
+            <span>Fat <em>/100g</em></span>
+            <input type="number" name="fat" min="0" step="0.1" placeholder="0">
+          </label>
+          <label class="nf-field">
+            <span>Calories <em>/100g</em></span>
+            <input type="number" name="kcal" min="1" step="1" placeholder="0" required>
+          </label>
+        </div>
+        <div style="margin-top:0.7rem;display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+          <button class="btn" type="submit">Add to my foods</button>
+          <span id="new-food-status"></span>
+        </div>
+      </form>
+    </details>
+
+    <!-- Remove an ingredient — pick from the whole library and delete it -->
+    <details class="food-ai" style="margin-top:1rem">
+      <summary>Remove an ingredient <span style="color:var(--muted);font-weight:400">(delete a food you don't want from your list)</span></summary>
+      <form class="del-food-form panel" style="margin-top:0.6rem;display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap"
+            hx-post="/food/library/delete"
+            hx-target="#del-food-status"
+            hx-confirm="Remove this food from your list? (Anything already logged stays.)"
+            hx-on::after-request="if(event.detail.successful){loadFoodOptions();this.reset();}">
+        <select name="name" id="food-delete-select" required style="flex:1 1 220px">
+          <option value="" disabled selected>Select a food to remove…</option>
+        </select>
+        <button class="btn btn-danger" type="submit">Delete</button>
+        <span id="del-food-status"></span>
+      </form>
+    </details>
+
+    <!-- AI helper — only for looking up & saving a NEW ingredient (uses API) -->
+    <details class="food-ai" style="margin-top:1rem">
+      <summary>New ingredient? Ask the AI to look it up &amp; add it to your list <span style="color:var(--muted);font-weight:400">(uses API)</span></summary>
+      <div id="food-history" class="panel" style="margin-top:0.6rem"
+           hx-get="/food/history" hx-trigger="load">
+        <div class="empty">Loading…</div>
+      </div>
+      <form class="chat-form"
+            hx-post="/food"
+            hx-encoding="multipart/form-data"
+            hx-target="#food-history"
+            hx-swap="beforeend scroll:bottom"
+            hx-disabled-elt="find button, find textarea"
+            hx-on::after-request="this.reset();
+              this.querySelector('.food-photo-name').textContent='';
+              document.getElementById('food-history').scrollTop=99999;
+              if (event.detail.successful) initFood();">
+        <textarea name="message"
+                  placeholder="Describe a new food (e.g. '100g cooked quinoa') — the AI adds it to your list — or attach a photo"></textarea>
+        <label title="Attach a food photo"
+               style="cursor:pointer;padding:0.5rem 0.7rem;background:var(--panel);
+                      border:1px solid var(--border);border-radius:var(--radius);font-size:1.1rem">
+          📷
+          <input type="file" name="photo" accept="image/*" style="display:none"
+                 onchange="this.closest('form').querySelector('.food-photo-name').textContent=this.files[0]?this.files[0].name:''">
+        </label>
+        <span class="food-photo-name" style="font-size:0.74rem;color:var(--muted);align-self:center"></span>
+        <button class="btn" type="submit">Send</button>
+      </form>
+      <div style="margin-top:0.5rem">
+        <button class="btn btn-small btn-danger"
+                hx-post="/food/clear"
+                hx-target="#food-history"
+                hx-confirm="Clear food chat? (Your logged food data stays.)">Clear chat</button>
+      </div>
+    </details>
   </div>
 
 </main>
 
+</div><!-- /app-shell -->
+
 <!-- ── Mobile bottom nav ───────────────────────────────────────────────── -->
 <nav class="mobile-nav">
-  <button class="mobile-tab active" data-tab="dashboard">
-    <span class="mobile-icon">&#127939;</span>
+  <button class="mobile-tab active" data-tab="today">
+    <span class="mobile-icon"><i class="ti ti-layout-dashboard" aria-hidden="true"></i></span>
+    <span>Today</span>
+  </button>
+  <button class="mobile-tab" data-tab="dashboard">
+    <span class="mobile-icon"><i class="ti ti-run" aria-hidden="true"></i></span>
     <span>Running</span>
   </button>
   <button class="mobile-tab" data-tab="cycling">
-    <span class="mobile-icon">&#128692;</span>
+    <span class="mobile-icon"><i class="ti ti-bike" aria-hidden="true"></i></span>
     <span>Cycling</span>
   </button>
   <button class="mobile-tab" data-tab="sleep">
-    <span class="mobile-icon">&#128564;</span>
+    <span class="mobile-icon"><i class="ti ti-moon" aria-hidden="true"></i></span>
     <span>Sleep</span>
   </button>
   <button class="mobile-tab" data-tab="calories">
-    <span class="mobile-icon">&#128293;</span>
+    <span class="mobile-icon"><i class="ti ti-flame" aria-hidden="true"></i></span>
     <span>Calories</span>
   </button>
-  <button class="mobile-tab" data-tab="plan">
-    <span class="mobile-icon">&#128197;</span>
-    <span>Plan</span>
+  <button class="mobile-tab" data-tab="food">
+    <span class="mobile-icon"><i class="ti ti-salad" aria-hidden="true"></i></span>
+    <span>Food</span>
   </button>
   <button class="mobile-tab" data-tab="goals">
-    <span class="mobile-icon">&#127919;</span>
+    <span class="mobile-icon"><i class="ti ti-target" aria-hidden="true"></i></span>
     <span>Goals</span>
   </button>
   <button class="mobile-tab" data-tab="coach">
-    <span class="mobile-icon">&#128172;</span>
-    <span>Coach</span>
-  </button>
-  <button class="mobile-tab" data-tab="food">
-    <span class="mobile-icon">&#127869;</span>
-    <span>Food</span>
+    <span class="mobile-icon"><i class="ti ti-scale" aria-hidden="true"></i></span>
+    <span>Calibration</span>
   </button>
 </nav>
 
@@ -973,50 +1196,175 @@ function showTab(name) {
   document.querySelectorAll('[data-tab]').forEach(el => el.classList.remove('active'));
   document.getElementById('panel-' + name).hidden = false;
   document.querySelectorAll('[data-tab="' + name + '"]').forEach(el => el.classList.add('active'));
+  if (name === 'today')     initToday();
   if (name === 'dashboard') initDashboard();
   if (name === 'goals')     initGoals();
   if (name === 'cycling')   initCycling();
   if (name === 'sleep')     initSleep();
   if (name === 'calories')  initCalories();
   if (name === 'food')      initFood();
+  if (name === 'coach')     initCoach();
 }
 
 document.querySelectorAll('[data-tab]').forEach(btn => {
   btn.addEventListener('click', () => showTab(btn.dataset.tab));
 });
 
-// ── Chart helpers ──────────────────────────────────────────────────────────
-function fmtPace(dec) {
-  if (!dec) return '—';
-  const m = Math.floor(dec), s = Math.round((dec - m) * 60);
-  return m + ':' + String(s === 60 ? (m + 1) + ':00' : (s < 10 ? '0' + s : s));
+// Any food add/remove (server sends HX-Trigger: foodChanged) refreshes the
+// macros chart + dropdown. Listens on body so it fires even when the button
+// that triggered it was swapped out of the DOM.
+document.body.addEventListener('foodChanged', function () { initFood(); });
+
+// ── Coach: body weight + calorie validation ────────────────────────────────
+function setWeightDateToday(){ const el=document.getElementById('weight-date'); if(el && !el.value) el.value = todayISO(); }
+function initCoach(){ setWeightDateToday(); loadWeight().catch(()=>{}); }
+document.body.addEventListener('weightChanged', function(){ loadWeight().catch(()=>{}); });
+
+let _weightChart = null;
+async function loadWeight(){
+  const d = await fetch('/weight/balance').then(r => r.json());
+  const stats = document.getElementById('weight-stats');
+  const val   = document.getElementById('weight-validate');
+  if (!stats) return;
+
+  if (!d.latest){
+    stats.innerHTML = '<div class="empty" style="grid-column:1/-1">No weight logged yet — add today’s above.</div>';
+    val.className = ''; val.innerHTML = '';
+    if (_weightChart){ _weightChart.destroy(); _weightChart = null; }
+    return;
+  }
+
+  // Δ vs last week
+  let deltaTxt='—', deltaColor='var(--muted)', dirTxt='vs last week';
+  if (d.measured != null){
+    deltaTxt = (d.measured>0?'+':'') + d.measured.toFixed(1) + ' kg';
+    if (d.measured < -0.05){ deltaColor='var(--green)'; dirTxt='losing vs last week'; }
+    else if (d.measured > 0.05){ deltaColor='var(--red)'; dirTxt='gaining vs last week'; }
+    else { dirTxt='holding vs last week'; }
+  }
+  const avgTxt    = d.cur_avg != null ? d.cur_avg.toFixed(1)+' kg' : '—';
+  const latestTxt = d.latest ? d.latest.kg.toFixed(1)+' kg' : '—';
+  stats.innerHTML =
+    `<div class="weight-stat"><div class="v">${latestTxt}</div><div class="l">Latest (${d.latest.date.slice(5)})</div></div>`+
+    `<div class="weight-stat"><div class="v">${avgTxt}</div><div class="l">7-day avg (${d.cur_n}/7 days)</div></div>`+
+    `<div class="weight-stat"><div class="v" style="color:${deltaColor}">${deltaTxt}</div><div class="l">${dirTxt}</div></div>`;
+
+  // body composition (LBM / BMR from the 7-day average weight)
+  const comp = document.getElementById('comp-stats');
+  const bfEl = document.getElementById('bodyfat-input');
+  if (bfEl && d.bodyfat != null && document.activeElement !== bfEl) bfEl.value = d.bodyfat;
+  const afEl = document.getElementById('activity-input');
+  if (afEl && d.manual_factor != null && document.activeElement !== afEl) afEl.value = d.manual_factor;
+  const autoBtn = document.getElementById('af-auto-btn');
+  if (autoBtn) autoBtn.className = 'btn btn-small' + (d.activity_mode === 'dynamic' ? '' : ' btn-ghost');
+  if (comp){
+    if (d.lbm != null && d.bmr != null){
+      const modeTag = d.activity_mode === 'dynamic' ? 'auto' : 'manual';
+      let note = '';
+      if (d.activity_mode === 'dynamic' && d.garmin_tdee != null){
+        note = `<div style="font-size:0.78rem;color:var(--muted);margin-top:0.45rem">&times;${d.activity} computed from Garmin's measured burn (<strong>${d.garmin_tdee.toLocaleString()} kcal/day</strong>) ÷ your BMR — it self-adjusts to each week's load.</div>`;
+      } else if (d.maintenance != null && d.garmin_tdee != null){
+        const diff = d.garmin_tdee - d.maintenance;
+        const tag = Math.abs(diff) <= 150 ? 'in line with' : (diff>0 ? `${Math.abs(diff).toLocaleString()} kcal above` : `${Math.abs(diff).toLocaleString()} kcal below`);
+        note = `<div style="font-size:0.78rem;color:var(--muted);margin-top:0.45rem">Garmin's measured burn averages <strong>${d.garmin_tdee.toLocaleString()} kcal/day</strong> — ${tag} your manual estimate (Auto would use ×${d.dynamic_factor}).</div>`;
+      }
+      comp.innerHTML =
+        `<div class="weight-stats">`+
+          `<div class="weight-stat"><div class="v">${d.bmr.toLocaleString()}</div><div class="l">BMR · Katch-McArdle</div></div>`+
+          `<div class="weight-stat"><div class="v">${d.lbm.toFixed(1)} kg</div><div class="l">Lean mass · ${d.bodyfat}% BF</div></div>`+
+          `<div class="weight-stat"><div class="v">${d.maintenance!=null?d.maintenance.toLocaleString():'—'}</div><div class="l">Maintenance · ×${d.activity} ${modeTag}</div></div>`+
+        `</div>` + note;
+    } else {
+      comp.innerHTML = '<div class="empty" style="grid-column:1/-1">Log weight to compute LBM, BMR &amp; maintenance.</div>';
+    }
+  }
+
+  // validation card
+  if (d.verdict && d.measured != null && d.predicted != null){
+    val.className = 'weight-validate ' + (d.status || '');
+    const net = d.net_sum != null ? (d.net_sum>0?'+':'') + d.net_sum.toLocaleString() + ' kcal' : '—';
+    val.innerHTML =
+      `<span class="vt">Calorie check (${d.net_days}/7 complete days)</span>`+
+      `App's 7-day net: <strong>${net}</strong> &rarr; predicts <strong>${(d.predicted>0?'+':'')+d.predicted.toFixed(1)} kg</strong>. `+
+      `You actually changed <strong>${(d.measured>0?'+':'')+d.measured.toFixed(1)} kg</strong>. ${d.verdict}`;
+  } else {
+    val.className = 'weight-validate';
+    val.innerHTML = `<span class="vt">Calorie check</span>Log weight for ~2 weeks (and keep food + calories synced) to validate the deficit.`;
+  }
+
+  // chart: daily weight + 7-day average line
+  const s = d.series || [];
+  if (_weightChart){ _weightChart.destroy(); }
+  _weightChart = new Chart(document.getElementById('chart-weight'), {
+    type: 'line',
+    data: {
+      labels: s.map(p => fmtWeek(p.date)),
+      datasets: [
+        { label:'Daily', data:s.map(p=>p.kg), borderColor:'#c3c9d2', backgroundColor:'#c3c9d2',
+          borderWidth:1, pointRadius:2, tension:0.2, spanGaps:true },
+        { label:'7-day avg', data:s.map(p=>p.avg7), borderColor:'#d97706', backgroundColor:'transparent',
+          borderWidth:2.5, pointRadius:0, tension:0.3, spanGaps:true },
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:true, labels:{ boxWidth:10, font:{size:10} } } },
+      scales:{ y:{ ticks:{ callback:v => (+v).toFixed(1)+' kg' } } }
+    }
+  });
 }
+
+// ── Chart helpers ──────────────────────────────────────────────────────────
 function fmtWeek(dateStr) {
   // "2026-06-02" → "Jun 2"
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
 }
 
+// ── Shared chart styling — one palette + defaults for the whole app ─────────
+const CHART_FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+if (window.Chart) {
+  Chart.defaults.font.family = CHART_FONT;
+  Chart.defaults.font.size = 11;
+  Chart.defaults.color = '#667085';          // muted axis/legend text, app-wide
+}
+
+// Semantic palette — each domain keeps a primary hue so charts read as a family.
+const PALETTE = {
+  blue:   '#2f6fe0',   // running / protein (matches the UI accent)
+  green:  '#1f8a4c',   // positive / pace gains
+  red:    '#e05252',   // heart rate / fat
+  amber:  '#f5a623',   // calories / carbs / wake
+  purple: '#9b59b6',   // cycling
+  indigo: '#6c5ce7',   // sleep
+  teal:   '#17a2b8',   // HRV
+  grid:   'rgba(0,0,0,0.06)',
+  axis:   '#667085',
+};
+
 const CHART_BASE = {
   plugins: {
     legend: { display: false },
     tooltip: {
-      backgroundColor: '#1e2330',
-      titleColor: '#e6e8eb',
-      bodyColor: '#98a2b3',
-      borderColor: '#262b36',
+      backgroundColor: '#1a1d23',
+      titleColor: '#ffffff',
+      bodyColor: '#cbd2dc',
+      borderColor: 'rgba(255,255,255,0.08)',
       borderWidth: 1,
+      cornerRadius: 8,
       padding: 10,
+      usePointStyle: true,
+      titleFont: { weight: '600' },
     },
   },
   scales: {
     x: {
-      ticks: { color: '#98a2b3', font: { size: 10 }, maxTicksLimit: 8 },
-      grid:  { color: 'rgba(255,255,255,0.04)' },
+      ticks: { color: PALETTE.axis, font: { size: 10 }, maxTicksLimit: 8 },
+      grid:  { color: PALETTE.grid },
     },
     y: {
-      ticks: { color: '#98a2b3', font: { size: 10 } },
-      grid:  { color: 'rgba(255,255,255,0.04)' },
+      ticks: { color: PALETTE.axis, font: { size: 10 } },
+      grid:  { color: PALETTE.grid },
     },
   },
 };
@@ -1025,16 +1373,211 @@ const CHART_BASE = {
 let dashReady = false;
 const _charts = {};   // stores Chart instances so they can be destroyed on refresh
 
+function _cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+// Refetched on every visit — the Today picture changes through the day.
+async function initToday() {
+  let d;
+  try {
+    d = await fetch('/stats/today').then(r => r.json());
+  } catch (e) { return; }
+
+  document.getElementById('today-date').textContent = d.date_fmt || '';
+
+  // ── Readiness ──────────────────────────────────────────────────────────
+  const rd = d.readiness || {};
+  const rv = document.getElementById('today-readiness');
+  const rtag = document.getElementById('today-readiness-tag');
+  const rsub = document.getElementById('today-readiness-sub');
+  if (rd.has && rd.score != null) {
+    const tone = rd.score >= 80 ? 'tone-good' : rd.score >= 60 ? 'tone-warn' : 'tone-bad';
+    const word = rd.score >= 80 ? 'good' : rd.score >= 60 ? 'fair' : 'low';
+    rv.textContent = rd.score; rv.className = 'hero-value ' + tone;
+    rtag.textContent = word;   rtag.className = 'hero-pill ' + tone;
+    const bits = [];
+    if (rd.sleep_fmt && rd.sleep_fmt !== '—') bits.push(rd.sleep_fmt + ' sleep');
+    if (rd.hrv_ms != null) bits.push('HRV ' + rd.hrv_ms + ' ms');
+    rsub.textContent = bits.join(' · ') || 'Last night';
+  } else {
+    rv.textContent = '—'; rv.className = 'hero-value';
+    rtag.textContent = ''; rsub.textContent = 'No sleep data yet — sync Sleep';
+  }
+
+  // ── Planned today ──────────────────────────────────────────────────────
+  const pl = d.plan || {};
+  const pt = document.getElementById('today-plan-title');
+  const ps = document.getElementById('today-plan-sub');
+  if (pl.has && pl.is_rest) {
+    pt.textContent = 'Rest day';
+    ps.textContent = 'Recovery — no session planned';
+  } else if (pl.has) {
+    pt.textContent = pl.title || _cap(pl.workout_type || 'Workout');
+    const meta = [];
+    if (pl.distance_km) meta.push(pl.distance_km + ' km');
+    if (pl.duration_min) meta.push(pl.duration_min + ' min');
+    const parts = [];
+    if (pl.workout_type) parts.push(_cap(pl.workout_type));
+    if (meta.length) parts.push(meta.join(' · '));
+    ps.textContent = parts.join(' · ') || (pl.accepted ? 'Active plan' : 'Proposed plan');
+  } else {
+    pt.textContent = '—';
+    ps.textContent = 'No active plan — generate one';
+  }
+
+  // ── Energy balance ─────────────────────────────────────────────────────
+  const en = d.energy || {};
+  const bv = document.getElementById('today-balance');
+  const es = document.getElementById('today-energy-sub');
+  if (en.has_eaten && en.has_burned && en.balance != null) {
+    const sign = en.balance > 0 ? '+' : '';
+    bv.textContent = sign + en.balance.toLocaleString();
+    bv.className = 'hero-value ' + (en.balance > 0 ? 'tone-warn' : 'tone-good');
+    es.textContent = en.eaten.toLocaleString() + ' eaten · ' + en.burned.toLocaleString() + ' burned';
+  } else if (en.has_eaten) {
+    bv.textContent = en.eaten.toLocaleString(); bv.className = 'hero-value';
+    es.textContent = 'eaten today · burned not synced';
+  } else {
+    bv.textContent = '—'; bv.className = 'hero-value';
+    es.textContent = 'No food logged yet — open Food';
+  }
+
+  // ── Quick stats strip ──────────────────────────────────────────────────
+  const s = d.stats || {};
+  document.getElementById('today-weekkm').textContent  = s.week_km != null ? s.week_km + ' km' : '—';
+  document.getElementById('today-protein').textContent = s.protein_g != null ? s.protein_g + ' g' : '—';
+  document.getElementById('today-rhr').textContent     = s.resting_hr != null ? s.resting_hr : '—';
+  document.getElementById('today-vo2').textContent     = s.vo2max != null ? s.vo2max : '—';
+
+  // ── Energy balance (eaten − burned) ────────────────────────────────────
+  try {
+    renderBalance(await fetch('/stats/energy-balance').then(r => r.json()));
+  } catch (e) { /* leave the section empty on error */ }
+
+  // ── Training load + recovery (TRIMP · runs + rides vs HRV) ──────────────
+  try {
+    renderLoad(await fetch('/stats/training-load').then(r => r.json()));
+  } catch (e) { /* leave the section empty on error */ }
+}
+
+let _loadChart = null;
+function renderLoad(d) {
+  const weeks = (d && d.weeks) || [];
+  const sumEl = document.getElementById('load-summary');
+  if (_loadChart) { _loadChart.destroy(); _loadChart = null; }
+  if (!weeks.length) { sumEl.textContent = 'Sync activities with heart rate to see training load.'; return; }
+
+  // Summary: ACWR + status + this week's load.
+  const a = d.acwr || {};
+  const last = weeks[weeks.length - 1] || {};
+  const tone = a.status === 'optimal' ? 'tone-good'
+             : (a.status === 'low' ? 'tone-warn' : 'tone-bad');
+  const acwrTxt = a.value != null
+    ? '<strong class="' + tone + '">' + a.value + '</strong> (' + a.status + ')'
+    : '<strong>—</strong>';
+  sumEl.innerHTML = 'ACWR ' + acwrTxt + ' · this week ' + (last.load || 0).toLocaleString()
+                  + ' load';
+  const p = d.params || {};
+  if (p.max_hr) sumEl.title = 'TRIMP from max HR ' + p.max_hr + ', resting HR ' + p.resting_hr;
+
+  _loadChart = new Chart(document.getElementById('chart-load'), {
+    data: {
+      labels: weeks.map(w => w.week_start.slice(5)),
+      datasets: [
+        { type: 'bar', label: 'Run load',  data: weeks.map(w => w.run_load),
+          backgroundColor: '#2f6fe0', stack: 'load', yAxisID: 'y', order: 2 },
+        { type: 'bar', label: 'Ride load', data: weeks.map(w => w.ride_load),
+          backgroundColor: '#9b59b6', stack: 'load', yAxisID: 'y', order: 2, borderRadius: 4 },
+        { type: 'line', label: 'HRV', data: weeks.map(w => w.hrv),
+          borderColor: '#17a2b8', backgroundColor: 'rgba(23,162,184,0.08)',
+          yAxisID: 'y1', tension: 0.35, borderWidth: 2, pointRadius: 2,
+          pointBackgroundColor: '#17a2b8', spanGaps: true, fill: false, order: 1 },
+      ],
+    },
+    options: {
+      ...CHART_BASE,
+      plugins: { ...CHART_BASE.plugins, legend: { display: false },
+        tooltip: { ...CHART_BASE.plugins.tooltip, callbacks: {
+          label: ctx => {
+            const w = weeks[ctx.dataIndex];
+            if (ctx.dataset.label === 'HRV') return w.hrv == null ? 'HRV: —' : 'HRV: ' + w.hrv + ' ms';
+            return ctx.dataset.label + ': ' + ctx.raw;
+          },
+          afterBody: items => {
+            const w = weeks[items[0].dataIndex];
+            return 'Total load: ' + w.load + (w.resting_hr ? '  ·  RHR ' + w.resting_hr : '');
+          },
+        } },
+      },
+      scales: {
+        x: { ...CHART_BASE.scales.x, stacked: true, grid: { display: false } },
+        y: { ...CHART_BASE.scales.y, stacked: true, beginAtZero: true,
+             title: { display: true, text: 'Load (TRIMP)', color: '#667085', font: { size: 10 } } },
+        y1: { position: 'right', beginAtZero: false, grid: { display: false },
+              ticks: { color: '#17a2b8', font: { size: 10 }, callback: v => v + ' ms' },
+              title: { display: true, text: 'HRV', color: '#17a2b8', font: { size: 10 } } },
+      },
+    },
+  });
+}
+
+let _balanceChart = null;
+function renderBalance(b) {
+  const rows = (b && b.days) || [];
+  const sumEl = document.getElementById('balance-summary');
+  if (_balanceChart) { _balanceChart.destroy(); _balanceChart = null; }
+
+  if (!rows.length) {
+    sumEl.textContent = 'Log food and sync Calories to see your balance.';
+    return;
+  }
+
+  // Summary: net over the days that have both numbers + approximate fat change
+  // (7,700 kcal ≈ 1 kg fat).
+  const net = b.net_sum || 0;
+  const kg = net / 7700;
+  const nDays = rows.filter(r => r.net != null).length;
+  sumEl.innerHTML = 'Net · ' + nDays + ' day' + (nDays === 1 ? '' : 's') + ': <strong>'
+                    + (net < 0 ? '−' : '+') + Math.abs(net).toLocaleString()
+                    + ' kcal</strong> · ≈ ' + (kg < 0 ? '−' : '+') + Math.abs(kg).toFixed(2) + ' kg fat';
+
+  // Diverging bar chart: deficit green (below 0), surplus red (above 0).
+  const labels = rows.map(r => r.date.slice(5));
+  _balanceChart = new Chart(document.getElementById('chart-balance'), {
+    type: 'bar',
+    data: { labels, datasets: [{
+      data: rows.map(r => r.net == null ? 0 : r.net),
+      backgroundColor: rows.map(r => r.net == null ? 'rgba(0,0,0,0.10)' : (r.net < 0 ? '#1f8a4c' : '#c0392b')),
+      borderRadius: 4, barPercentage: 0.62,
+    }]},
+    options: {
+      ...CHART_BASE,
+      plugins: { ...CHART_BASE.plugins, legend: { display: false },
+        tooltip: { ...CHART_BASE.plugins.tooltip, callbacks: {
+          label: ctx => {
+            const r = rows[ctx.dataIndex];
+            if (r.net == null) return r.eaten.toLocaleString() + ' eaten · burned not synced';
+            return [(r.net < 0 ? 'Deficit ' : 'Surplus ') + (r.net < 0 ? '−' : '+') + Math.abs(r.net) + ' kcal',
+                    r.eaten.toLocaleString() + ' eaten · ' + r.burned.toLocaleString() + ' burned'];
+          },
+        } },
+      },
+      scales: { ...CHART_BASE.scales,
+        x: { ...CHART_BASE.scales.x, grid: { display: false } },
+        y: { ...CHART_BASE.scales.y, ticks: { ...CHART_BASE.scales.y.ticks, callback: v => (v < 0 ? '−' : '') + Math.abs(v) } },
+      },
+    },
+  });
+}
+
 async function initDashboard() {
   if (dashReady) return;
   dashReady = true;
 
   try {
-    const [summary, mileage, pace, hr, prs] = await Promise.all([
+    const [summary, mileage, load, prs] = await Promise.all([
       fetch('/stats/summary').then(r => r.json()),
       fetch('/stats/weekly-mileage').then(r => r.json()),
-      fetch('/stats/pace-trend').then(r => r.json()),
-      fetch('/stats/hr-trend').then(r => r.json()),
+      fetch('/stats/training-load?sport=running').then(r => r.json()),
       fetch('/stats/prs').then(r => r.json()),
     ]);
 
@@ -1056,7 +1599,7 @@ async function initDashboard() {
           datasets: [{
             data: mileage.values,
             backgroundColor: 'rgba(79,140,255,0.45)',
-            borderColor: '#4f8cff',
+            borderColor: '#2f6fe0',
             borderWidth: 1,
             borderRadius: 4,
           }],
@@ -1081,85 +1624,112 @@ async function initDashboard() {
       });
     }
 
-    // Pace trend line chart (Y axis inverted: lower pace = faster = visually higher)
-    if (pace.labels && pace.labels.length) {
-      _charts.pace = new Chart(document.getElementById('chart-pace'), {
-        type: 'line',
+    // Running load — weekly TRIMP (runs only) + chronic baseline & safe ramp band
+    const lw = (load && load.weeks) || [];
+    if (lw.length) {
+      _charts.runLoad = new Chart(document.getElementById('chart-run-load'), {
         data: {
-          labels: pace.labels,
-          datasets: [{
-            data: pace.values,
-            borderColor: '#1f8a4c',
-            backgroundColor: 'rgba(31,138,76,0.07)',
-            tension: 0.35,
-            fill: true,
-            pointRadius: 3,
-            pointHoverRadius: 5,
-            pointBackgroundColor: '#1f8a4c',
-          }],
+          labels: lw.map(w => fmtWeek(w.week_start)),
+          datasets: [
+            // Bars: the week's load. The in-progress week is faded so a
+            // half-finished week doesn't read as a sudden drop.
+            { type: 'bar', label: 'Load', order: 3,
+              data: lw.map(w => w.run_load),
+              backgroundColor: lw.map(w => w.partial ? 'rgba(47,111,224,0.18)' : 'rgba(47,111,224,0.55)'),
+              borderColor: lw.map(w => w.partial ? 'rgba(47,111,224,0.45)' : '#2f6fe0'),
+              borderWidth: 1, borderRadius: 4 },
+            // Safe ramp band: 1.3× baseline down to 0.8× baseline.
+            { type: 'line', label: 'Upper', order: 1,
+              data: lw.map(w => w.baseline ? Math.round(w.baseline * 1.3) : null),
+              borderColor: 'rgba(31,138,76,0.35)', borderDash: [5, 4], borderWidth: 1,
+              pointRadius: 0, backgroundColor: 'rgba(31,138,76,0.07)', fill: '+1' },
+            { type: 'line', label: 'Lower', order: 1,
+              data: lw.map(w => w.baseline ? Math.round(w.baseline * 0.8) : null),
+              borderColor: 'rgba(31,138,76,0.35)', borderDash: [5, 4], borderWidth: 1,
+              pointRadius: 0, fill: false },
+            // The chronic baseline itself — what the body is adapted to.
+            { type: 'line', label: 'Baseline', order: 2,
+              data: lw.map(w => w.baseline || null),
+              borderColor: '#667085', borderDash: [4, 3], borderWidth: 1.5,
+              pointRadius: 0, fill: false },
+          ],
         },
         options: {
           ...CHART_BASE,
           plugins: {
             ...CHART_BASE.plugins,
+            legend: { display: false },
             tooltip: {
               ...CHART_BASE.plugins.tooltip,
-              callbacks: {
-                label: ctx => fmtPace(ctx.raw) + '/km  |  ' + pace.distances[ctx.dataIndex] + ' km run',
-              },
-            },
-          },
-          scales: {
-            ...CHART_BASE.scales,
-            y: {
-              ...CHART_BASE.scales.y,
-              reverse: true,
-              ticks: { ...CHART_BASE.scales.y.ticks, callback: v => fmtPace(v) },
-            },
-          },
-        },
-      });
-    }
-
-    // Heart rate trend
-    if (hr.labels && hr.labels.length) {
-      _charts.hr = new Chart(document.getElementById('chart-hr'), {
-        type: 'line',
-        data: {
-          labels: hr.labels,
-          datasets: [{
-            data: hr.values,
-            borderColor: '#e05252',
-            backgroundColor: 'rgba(224,82,82,0.07)',
-            tension: 0.35,
-            fill: true,
-            pointRadius: 3,
-            pointHoverRadius: 5,
-            pointBackgroundColor: '#e05252',
-          }],
-        },
-        options: {
-          ...CHART_BASE,
-          plugins: {
-            ...CHART_BASE.plugins,
-            tooltip: {
-              ...CHART_BASE.plugins.tooltip,
+              filter: item => item.dataset.label === 'Load',
               callbacks: {
                 label: ctx => {
-                  const pace = hr.paces[ctx.dataIndex];
-                  const paceStr = pace ? '  |  ' + fmtPace(pace) + '/km' : '';
-                  return ctx.raw + ' bpm  |  ' + hr.distances[ctx.dataIndex] + ' km' + paceStr;
+                  const w = lw[ctx.dataIndex];
+                  return 'Load ' + w.run_load + ' TRIMP' + (w.partial ? '  (week in progress)' : '');
+                },
+                afterBody: items => {
+                  const w = lw[items[0].dataIndex];
+                  const bits = [];
+                  if (w.baseline) {
+                    bits.push('Base ' + w.baseline + '  ·  safe '
+                              + Math.round(w.baseline * 0.8) + '–' + Math.round(w.baseline * 1.3));
+                  }
+                  if (w.acwr != null) bits.push('ACWR ' + w.acwr);
+                  return bits.join('\n');
                 },
               },
             },
           },
           scales: {
             ...CHART_BASE.scales,
-            y: {
-              ...CHART_BASE.scales.y,
-              beginAtZero: false,
-              ticks: { ...CHART_BASE.scales.y.ticks, callback: v => v + ' bpm' },
+            x: { ...CHART_BASE.scales.x, grid: { display: false } },
+            y: { ...CHART_BASE.scales.y, beginAtZero: true,
+                 title: { display: true, text: 'Load (TRIMP)', color: '#667085', font: { size: 10 } } },
+          },
+        },
+      });
+    }
+
+    // ACWR trend with the 0.8–1.3 safe band
+    const aw = lw.filter(w => w.acwr != null);
+    if (aw.length) {
+      _charts.runAcwr = new Chart(document.getElementById('chart-run-acwr'), {
+        type: 'line',
+        data: {
+          labels: aw.map(w => fmtWeek(w.week_start)),
+          datasets: [
+            { label: 'ACWR', data: aw.map(w => w.acwr),
+              borderColor: '#7c3aed', backgroundColor: 'rgba(124,58,237,0.08)',
+              tension: 0.3, fill: true, pointRadius: 3, pointHoverRadius: 5,
+              pointBackgroundColor: aw.map(w => w.acwr > 1.5 ? '#c0392b'
+                                              : (w.acwr < 0.8 ? '#c2740a' : '#1f8a4c')),
+              order: 1 },
+            { label: 'Upper (1.3)', data: aw.map(() => 1.3), borderColor: 'rgba(192,57,43,0.45)',
+              borderDash: [5, 4], borderWidth: 1, pointRadius: 0, fill: false, order: 2 },
+            { label: 'Lower (0.8)', data: aw.map(() => 0.8), borderColor: 'rgba(194,116,10,0.45)',
+              borderDash: [5, 4], borderWidth: 1, pointRadius: 0, fill: false, order: 2 },
+          ],
+        },
+        options: {
+          ...CHART_BASE,
+          plugins: {
+            ...CHART_BASE.plugins,
+            legend: { display: false },
+            tooltip: {
+              ...CHART_BASE.plugins.tooltip,
+              filter: item => item.dataset.label === 'ACWR',
+              callbacks: {
+                label: ctx => 'ACWR ' + ctx.raw + (ctx.raw > 1.5 ? '  (very high)'
+                              : ctx.raw > 1.3 ? '  (high)'
+                              : ctx.raw < 0.8 ? '  (low)' : '  (optimal)'),
+              },
             },
+          },
+          scales: {
+            ...CHART_BASE.scales,
+            x: { ...CHART_BASE.scales.x, grid: { display: false } },
+            y: { ...CHART_BASE.scales.y, beginAtZero: false,
+                 ticks: { ...CHART_BASE.scales.y.ticks, callback: v => (+v).toFixed(1) } },
           },
         },
       });
@@ -1217,7 +1787,7 @@ async function initGoals() {
             type: 'line',
             label: 'Weekly avg',
             data: data.trend.map(r => ({ x: r.date, y: r.efficiency })),
-            borderColor: '#4f8cff',
+            borderColor: '#2f6fe0',
             backgroundColor: 'rgba(79,140,255,0.08)',
             borderWidth: 2.5,
             pointRadius: 0,
@@ -1248,21 +1818,21 @@ async function initGoals() {
           x: {
             type: 'time',
             time: { unit: 'month', tooltipFormat: 'MMM d, yyyy' },
-            ticks: { color: '#98a2b3', font: { size: 10 }, maxTicksLimit: 10 },
-            grid:  { color: 'rgba(255,255,255,0.04)' },
+            ticks: { color: '#667085', font: { size: 10 }, maxTicksLimit: 10 },
+            grid:  { color: 'rgba(0,0,0,0.06)' },
           },
           y: {
             beginAtZero: false,
             ticks: {
-              color: '#98a2b3',
+              color: '#667085',
               font: { size: 10 },
               callback: v => v.toFixed(1),
             },
-            grid: { color: 'rgba(255,255,255,0.04)' },
+            grid: { color: 'rgba(0,0,0,0.06)' },
             title: {
               display: true,
               text: 'Efficiency (higher = fitter)',
-              color: '#98a2b3',
+              color: '#667085',
               font: { size: 10 },
             },
           },
@@ -1284,11 +1854,12 @@ async function initCycling() {
   cycReady = true;
 
   try {
-    const [summary, dist, speed, hr] = await Promise.all([
+    const [summary, dist, speed, hr, aero] = await Promise.all([
       fetch('/stats/cycling/summary').then(r => r.json()),
       fetch('/stats/cycling/weekly-distance').then(r => r.json()),
       fetch('/stats/cycling/speed-trend').then(r => r.json()),
       fetch('/stats/cycling/hr-trend').then(r => r.json()),
+      fetch('/stats/cycling/aerobic-efficiency').then(r => r.json()),
     ]);
 
     document.getElementById('cyc-rides').textContent = (summary.total_rides || 0).toLocaleString();
@@ -1407,6 +1978,66 @@ async function initCycling() {
         },
       });
     }
+
+    // Aerobic efficiency — scatter of rides + weekly-average trend line
+    if (aero.runs && aero.runs.length) {
+      _cycCharts.aero = new Chart(document.getElementById('chart-cyc-aerobic'), {
+        data: {
+          datasets: [
+            {
+              type: 'scatter',
+              label: 'Ride',
+              data: aero.runs.map(r => ({ x: r.date, y: r.efficiency })),
+              backgroundColor: 'rgba(155,89,182,0.18)',
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              order: 2,
+            },
+            {
+              type: 'line',
+              label: 'Weekly avg',
+              data: aero.trend.map(r => ({ x: r.date, y: r.efficiency })),
+              borderColor: CYC,
+              backgroundColor: 'rgba(155,89,182,0.08)',
+              borderWidth: 2.5,
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              tension: 0.35,
+              fill: true,
+              order: 1,
+            },
+          ],
+        },
+        options: {
+          ...CHART_BASE,
+          plugins: {
+            ...CHART_BASE.plugins,
+            legend: { display: false },
+            tooltip: {
+              ...CHART_BASE.plugins.tooltip,
+              callbacks: {
+                title: items => items[0].raw.x,
+                label: ctx => (ctx.dataset.label === 'Ride' ? 'Efficiency' : 'Weekly avg')
+                               + ': ' + ctx.raw.y.toFixed(2),
+              },
+            },
+          },
+          scales: {
+            x: {
+              type: 'time',
+              time: { unit: 'month', tooltipFormat: 'MMM d, yyyy' },
+              ticks: { color: '#667085', font: { size: 10 }, maxTicksLimit: 8 },
+              grid:  { color: 'rgba(0,0,0,0.06)' },
+            },
+            y: {
+              beginAtZero: false,
+              ticks: { color: '#667085', font: { size: 10 }, callback: v => v.toFixed(1) },
+              grid:  { color: 'rgba(0,0,0,0.06)' },
+            },
+          },
+        },
+      });
+    }
   } catch (err) {
     console.error('Cycling init error:', err);
   }
@@ -1422,10 +2053,11 @@ async function initSleep() {
   sleepReady = true;
 
   try {
-    const [nsum, nights, t] = await Promise.all([
+    const [nsum, nights, t, hrvW] = await Promise.all([
       fetch('/stats/sleep/nights/summary').then(r => r.json()),
       fetch('/stats/sleep/nights').then(r => r.json()),
       fetch('/stats/sleep/trend').then(r => r.json()),
+      fetch('/stats/sleep/hrv-trend').then(r => r.json()),
     ]);
 
     Object.keys(_slpCharts).forEach(k => { if (_slpCharts[k]) { _slpCharts[k].destroy(); delete _slpCharts[k]; } });
@@ -1452,7 +2084,7 @@ async function initSleep() {
         options: {
           ...CHART_BASE,
           plugins: { ...CHART_BASE.plugins,
-            legend: { display: true, labels: { color: '#98a2b3', font: { size: 10 }, boxWidth: 12 } },
+            legend: { display: true, labels: { color: '#667085', font: { size: 10 }, boxWidth: 12 } },
             tooltip: { ...CHART_BASE.plugins.tooltip, callbacks: {
               label: ctx => {
                 const f = ctx.dataset.label === 'Deep' ? nights.deep_fmt
@@ -1462,7 +2094,7 @@ async function initSleep() {
           scales: {
             x: { ...CHART_BASE.scales.x, stacked: true },
             y: { ...CHART_BASE.scales.y, stacked: true, beginAtZero: true,
-                 ticks: { ...CHART_BASE.scales.y.ticks, callback: v => v + 'h' } },
+                 ticks: { ...CHART_BASE.scales.y.ticks, callback: v => (+v).toFixed(1).replace(/\.0$/, '') + 'h' } },
           },
         },
       });
@@ -1536,19 +2168,19 @@ async function initSleep() {
           { label: 'Slept', data: t.duration_h, borderColor: SLP,
             backgroundColor: 'rgba(108,109,231,0.10)', tension: 0.35, fill: true,
             pointRadius: 2, pointHoverRadius: 5, pointBackgroundColor: SLP, spanGaps: true },
-          { label: 'Need', data: t.need_h, borderColor: '#98a2b3', borderDash: [5,4],
+          { label: 'Need', data: t.need_h, borderColor: '#667085', borderDash: [5,4],
             tension: 0.35, fill: false, pointRadius: 0, pointHoverRadius: 4, spanGaps: true },
         ],
       },
       options: {
         ...CHART_BASE,
-        plugins: { ...CHART_BASE.plugins, legend: { display: true, labels: { color: '#98a2b3', font: { size: 10 }, boxWidth: 12 } },
+        plugins: { ...CHART_BASE.plugins, legend: { display: true, labels: { color: '#667085', font: { size: 10 }, boxWidth: 12 } },
           tooltip: { ...CHART_BASE.plugins.tooltip, callbacks: {
             label: ctx => ctx.dataset.label === 'Slept'
               ? 'Slept ' + t.duration_fmt[ctx.dataIndex]
               : 'Need ' + t.need_fmt[ctx.dataIndex] } } },
         scales: { ...CHART_BASE.scales,
-          y: { ...CHART_BASE.scales.y, ticks: { ...CHART_BASE.scales.y.ticks, callback: v => v + 'h' } } },
+          y: { ...CHART_BASE.scales.y, ticks: { ...CHART_BASE.scales.y.ticks, callback: v => (+v).toFixed(1).replace(/\.0$/, '') + 'h' } } },
       },
     });
 
@@ -1568,7 +2200,7 @@ async function initSleep() {
       },
       options: {
         ...CHART_BASE,
-        plugins: { ...CHART_BASE.plugins, legend: { display: true, labels: { color: '#98a2b3', font: { size: 10 }, boxWidth: 12 } },
+        plugins: { ...CHART_BASE.plugins, legend: { display: true, labels: { color: '#667085', font: { size: 10 }, boxWidth: 12 } },
           tooltip: { ...CHART_BASE.plugins.tooltip, callbacks: {
             label: ctx => ctx.dataset.label === 'Bedtime'
               ? 'Bed ' + (t.bedtime[ctx.dataIndex] || '—')
@@ -1578,6 +2210,38 @@ async function initSleep() {
             callback: v => { const h = Math.floor(v % 24); return (h < 10 ? '0' + h : h) + ':00'; } } } },
       },
     });
+
+    // HRV recovery baseline (weekly avg) — long-term recovery trend
+    if (hrvW.labels && hrvW.labels.length) {
+      _slpCharts.hrvWeekly = new Chart(document.getElementById('chart-slp-hrv'), {
+        type: 'line',
+        data: {
+          labels: hrvW.labels.map(fmtWeek),
+          datasets: [{
+            data: hrvW.hrv,
+            borderColor: '#17a2b8',
+            backgroundColor: 'rgba(23,162,184,0.08)',
+            tension: 0.35,
+            fill: true,
+            pointRadius: 2,
+            pointHoverRadius: 5,
+            pointBackgroundColor: '#17a2b8',
+            spanGaps: true,
+          }],
+        },
+        options: {
+          ...CHART_BASE,
+          plugins: { ...CHART_BASE.plugins,
+            tooltip: { ...CHART_BASE.plugins.tooltip, callbacks: {
+              label: ctx => (ctx.raw == null ? 'HRV: —' : 'HRV ' + ctx.raw + ' ms')
+                             + '  ·  ' + hrvW.nights[ctx.dataIndex] + ' night(s)',
+            } } },
+          scales: { ...CHART_BASE.scales,
+            y: { ...CHART_BASE.scales.y, beginAtZero: false,
+                 ticks: { ...CHART_BASE.scales.y.ticks, callback: v => v + ' ms' } } },
+        },
+      });
+    }
   } catch (err) {
     console.error('Sleep init error:', err);
   }
@@ -1600,7 +2264,7 @@ async function initCalories() {
     document.getElementById('cal-total').textContent   = (summary.avg_total   || 0).toLocaleString();
     document.getElementById('cal-active').textContent  = (summary.avg_active  || 0).toLocaleString();
     document.getElementById('cal-resting').textContent = (summary.avg_resting || 0).toLocaleString();
-    document.getElementById('cal-days').textContent    = summary.days_tracked || 0;
+    document.getElementById('cal-intake').textContent  = (summary.avg_intake || 0).toLocaleString();
 
     Object.keys(_calCharts).forEach(k => { if (_calCharts[k]) { _calCharts[k].destroy(); delete _calCharts[k]; } });
 
@@ -1619,7 +2283,7 @@ async function initCalories() {
       options: {
         ...CHART_BASE,
         plugins: { ...CHART_BASE.plugins,
-          legend: { display: true, labels: { color: '#98a2b3', font: { size: 10 }, boxWidth: 12 } },
+          legend: { display: true, labels: { color: '#667085', font: { size: 10 }, boxWidth: 12 } },
           tooltip: { ...CHART_BASE.plugins.tooltip, callbacks: {
             label: ctx => ctx.dataset.label + ' ' + ctx.raw.toLocaleString() + ' kcal' } } },
         scales: {
@@ -1655,7 +2319,78 @@ async function initCalories() {
 // ── Food: daily-macros bar chart (rebuilt on open and after each log) ───────
 let _foodChart = null;
 
+// ── Food date control — which day we log / view / edit ─────────────────────
+let _foodDate = null;
+function todayISO() { return new Date().toLocaleDateString('en-CA'); }   // local YYYY-MM-DD
+function setFoodDate(iso) {
+  if (!iso) iso = todayISO();
+  _foodDate = iso;
+  const dateEl = document.getElementById('food-date');
+  const dayEl  = document.getElementById('food-log-day');
+  const lblEl  = document.getElementById('food-date-label');
+  if (dateEl) dateEl.value = iso;
+  if (dayEl)  dayEl.value  = iso;            // the log form posts this day
+  if (lblEl)  lblEl.textContent = (iso === todayISO())
+      ? 'Today'
+      : new Date(iso + 'T00:00:00').toLocaleDateString(undefined,
+          { weekday: 'short', month: 'short', day: 'numeric' });
+  // Reload the totals bar + the day's entries for the chosen date.
+  htmx.ajax('GET', '/food/today?day=' + iso, { target: '#food-today', swap: 'innerHTML' });
+  htmx.ajax('GET', '/food/items?day=' + iso, { target: '#food-items', swap: 'innerHTML' });
+}
+function onFoodDateChange() { setFoodDate(document.getElementById('food-date').value); }
+function stepFoodDate(delta) {
+  const d = new Date((_foodDate || todayISO()) + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  setFoodDate(d.toLocaleDateString('en-CA'));
+}
+
+let _foodMap = {};
+async function loadFoodOptions() {
+  try {
+    const foods = await fetch('/food/foods').then(r => r.json());
+    const sel = document.getElementById('food-select');
+    if (!sel) return;
+    const current = sel.value;
+    _foodMap = {};
+    sel.innerHTML = '<option value="" disabled' + (current ? '' : ' selected') + '>Select a food…</option>'
+      + foods.map(f => {
+          _foodMap[f.name] = f;
+          const disp = f.name.charAt(0).toUpperCase() + f.name.slice(1);
+          const meas = Math.round(f.kcal) + ' kcal/100g · P' + Math.round(f.protein)
+                     + ' F' + Math.round(f.fat) + ' C' + Math.round(f.carbs);
+          const label = disp + '  —  ' + meas;
+          return '<option value="' + f.name.replace(/"/g, '&quot;') + '">' + label + '</option>';
+        }).join('');
+    if (current && _foodMap[current]) sel.value = current;
+
+    // Mirror the list into the "remove an ingredient" dropdown.
+    const del = document.getElementById('food-delete-select');
+    if (del) {
+      del.innerHTML = '<option value="" disabled selected>Select a food to remove…</option>'
+        + foods.map(f => {
+            const disp = f.name.charAt(0).toUpperCase() + f.name.slice(1);
+            return '<option value="' + f.name.replace(/"/g, '&quot;') + '">' + disp + '</option>';
+          }).join('');
+    }
+  } catch (e) { /* leave dropdown as-is */ }
+}
+function foodPreview() {
+  const sel = document.getElementById('food-select');
+  const gEl = document.getElementById('food-grams');
+  const out = document.getElementById('food-preview');
+  if (!sel || !gEl || !out) return;
+  const f = _foodMap[sel.value];
+  const g = parseFloat(gEl.value);
+  if (!f || !(g > 0)) { out.textContent = ''; return; }
+  const k = g / 100;
+  out.textContent = '→ ' + Math.round(f.kcal * k) + ' kcal · P ' + Math.round(f.protein * k)
+                  + ' F ' + Math.round(f.fat * k) + ' C ' + Math.round(f.carbs * k);
+}
+
 async function initFood() {
+  loadFoodOptions();
+  if (!_foodDate) setFoodDate(todayISO());   // default to today the first time
   try {
     const t = await fetch('/stats/nutrition/trend').then(r => r.json());
     const el = document.getElementById('chart-nutrition');
@@ -1681,9 +2416,9 @@ async function initFood() {
             ctx.fillText(Math.round(v) + 'g', bar.x, (bar.y + bar.base) / 2);
           });
         });
-        // total kcal above the top of each bar
+        // total kcal above the top of each bar (drawn on the chart bg)
         ctx.font = '700 11px Inter, sans-serif';
-        ctx.fillStyle = '#e6e8eb';
+        ctx.fillStyle = '#344054';
         ctx.textBaseline = 'bottom';
         chart.getDatasetMeta(chart.data.datasets.length - 1).data.forEach((bar, i) => {
           if (!t.kcal[i]) return;
@@ -1693,6 +2428,14 @@ async function initFood() {
       },
     };
 
+    // 14-day average calories, shown in the top-right corner of the chart card.
+    const last14 = (t.kcal || []).slice(-14).filter(k => k > 0);
+    const avg14 = last14.length
+      ? Math.round(last14.reduce((a, b) => a + b, 0) / last14.length) : 0;
+    const avgEl = document.getElementById('macros-avg14');
+    if (avgEl) avgEl.textContent = avg14
+      ? avg14.toLocaleString() + ' kcal' : '—';
+
     _foodChart = new Chart(el, {
       type: 'bar',
       data: {
@@ -1700,14 +2443,14 @@ async function initFood() {
         datasets: [
           { label: 'Fat',     data: t.fat_g,     backgroundColor: '#e05252' },
           { label: 'Carbs',   data: t.carbs_g,   backgroundColor: '#f5a623' },
-          { label: 'Protein', data: t.protein_g, backgroundColor: '#4f8cff' },
+          { label: 'Protein', data: t.protein_g, backgroundColor: '#2f6fe0' },
         ],
       },
       options: {
         ...CHART_BASE,
         plugins: {
           ...CHART_BASE.plugins,
-          legend: { display: true, labels: { color: '#98a2b3', font: { size: 10 }, boxWidth: 12 } },
+          legend: { display: true, labels: { color: '#667085', font: { size: 10 }, boxWidth: 12 } },
           tooltip: { ...CHART_BASE.plugins.tooltip, callbacks: {
             label: ctx => ctx.dataset.label + ' ' + Math.round(ctx.raw) + ' g' } },
         },
@@ -1743,7 +2486,7 @@ document.body.addEventListener('htmx:afterRequest', evt => {
 });
 
 // Start on dashboard
-document.addEventListener('DOMContentLoaded', () => showTab('dashboard'));
+document.addEventListener('DOMContentLoaded', () => showTab('today'));
 </script>
 </body>
 </html>

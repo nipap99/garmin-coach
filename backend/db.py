@@ -17,7 +17,7 @@ additional fields later without re-syncing.
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
-from typing import Any, Iterable
+from typing import Any
 
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
@@ -161,6 +161,23 @@ CREATE TABLE IF NOT EXISTS food_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_food_log_date ON food_log (log_date);
+
+-- Daily body-weight log (kg). A 7-day average smooths daily water/food noise;
+-- the week-over-week change in that average is the ground truth we validate the
+-- calorie model (eaten - burned) against -- roughly 7700 kcal per kg.
+CREATE TABLE IF NOT EXISTS weight_log (
+    day_date   TEXT PRIMARY KEY,   -- ISO date
+    weight_kg  DOUBLE PRECISION NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+-- Small key/value store for user settings (e.g. body-fat %, height) that feed
+-- the body-composition maths (LBM / BMR) in the Calibration tab.
+CREATE TABLE IF NOT EXISTS app_settings (
+    key        TEXT PRIMARY KEY,
+    value      TEXT,
+    updated_at TEXT NOT NULL
+);
 """
 
 VALID_DISTANCES = ("5k", "10k", "half_marathon", "marathon")
@@ -212,6 +229,21 @@ def get_connection():
     no exception was raised) when the ``with`` block exits.
     """
     return _get_pool().connection()
+
+
+def _week_start(d: date) -> date:
+    """The Sunday that begins the week containing ``d``.
+
+    The Garmin watch starts the training week on Sunday, so every weekly total
+    and bucket in the app matches that. (Python's ``weekday()`` has Monday = 0,
+    hence the ``+ 1``: Sunday → 0 days back, Monday → 1, … Saturday → 6.)
+    """
+    return d - timedelta(days=(d.weekday() + 1) % 7)
+
+
+# Postgres expression: the Sunday that begins the week of a date column.
+# Shift the date +1 day, truncate to the ISO (Monday) week, then step back 1 day.
+_SUNDAY_WEEK = "DATE_TRUNC('week', start_local::date + INTERVAL '1 day') - INTERVAL '1 day'"
 
 
 # ----------------------------- Activities ----------------------------------
@@ -280,15 +312,6 @@ def upsert_activity(
             """,
             payload,
         )
-
-
-def upsert_many(items: Iterable[tuple[dict[str, Any], dict[str, Any]]]) -> int:
-    """Bulk upsert; each item is ``(summary, raw_dict)``. Returns count inserted/updated."""
-    count = 0
-    for summary, raw in items:
-        upsert_activity(summary, raw)
-        count += 1
-    return count
 
 
 def get_recent_activities(days: int = 30, limit: int = 200) -> list[dict[str, Any]]:
@@ -457,7 +480,7 @@ def get_stats_summary() -> dict[str, Any]:
     """Totals for the dashboard stat cards."""
     today = date.today()
     month_start = today.replace(day=1).isoformat()
-    week_start = (today - timedelta(days=today.weekday())).isoformat()
+    week_start = _week_start(today).isoformat()
     with get_connection() as conn:
         row = conn.execute(
             """
@@ -481,57 +504,20 @@ def get_weekly_mileage(weeks: int = 16) -> list[dict[str, Any]]:
     cutoff = (date.today() - timedelta(weeks=weeks)).isoformat()
     with get_connection() as conn:
         rows = conn.execute(
-            """
+            f"""
             SELECT
-                TO_CHAR(DATE_TRUNC('week', start_local::date), 'YYYY-MM-DD') AS week_start,
-                ROUND(SUM(distance_km)::numeric, 1)                           AS total_km,
-                COUNT(*)                                                       AS run_count
+                TO_CHAR({_SUNDAY_WEEK}, 'YYYY-MM-DD') AS week_start,
+                ROUND(SUM(distance_km)::numeric, 1)   AS total_km,
+                COUNT(*)                              AS run_count
             FROM activities
             WHERE start_local >= %s AND distance_km > 0
               AND activity_type = 'running'
-            GROUP BY DATE_TRUNC('week', start_local::date)
+            GROUP BY {_SUNDAY_WEEK}
             ORDER BY week_start ASC
             """,
             (cutoff,),
         ).fetchall()
     return [dict(r) for r in rows]
-
-
-def get_pace_trend(limit: int = 30) -> list[dict[str, Any]]:
-    """Last N meaningful runs (≥3 km, plausible pace) ordered oldest first."""
-    with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT start_local, avg_pace_min_per_km, distance_km
-            FROM activities
-            WHERE avg_pace_min_per_km IS NOT NULL
-              AND avg_pace_min_per_km BETWEEN 3.0 AND 12.0
-              AND distance_km >= 3
-              AND activity_type = 'running'
-            ORDER BY start_local DESC
-            LIMIT %s
-            """,
-            (limit,),
-        ).fetchall()
-    return [dict(r) for r in reversed(rows)]
-
-
-def get_hr_trend(limit: int = 30) -> list[dict[str, Any]]:
-    """Last N runs (>=3 km) with a recorded avg HR, oldest first."""
-    with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT start_local, avg_hr, distance_km, avg_pace_min_per_km
-            FROM activities
-            WHERE avg_hr IS NOT NULL AND avg_hr > 0
-              AND distance_km >= 3
-              AND activity_type = 'running'
-            ORDER BY start_local DESC
-            LIMIT %s
-            """,
-            (limit,),
-        ).fetchall()
-    return [dict(r) for r in reversed(rows)]
 
 
 def get_aerobic_efficiency_runs() -> list[dict[str, Any]]:
@@ -552,6 +538,30 @@ def get_aerobic_efficiency_runs() -> list[dict[str, Any]]:
               AND avg_hr > 0
               AND avg_pace_min_per_km BETWEEN 4.0 AND 12.0
               AND activity_type = 'running'
+            ORDER BY start_local ASC
+            """,
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_cycling_aerobic_efficiency_rides() -> list[dict[str, Any]]:
+    """Rides suitable for the cycling aerobic-efficiency chart (speed ÷ HR).
+
+    Mirrors the running version, adapted for cycling:
+    - distance >= 5 km         (short rides skew the average)
+    - avg_hr > 0               (must have heart-rate data)
+    - avg_speed_kmh 5–60 km/h  (excludes stationary noise and downhill sprints)
+    Returns oldest first so the chart renders left → right in time.
+    """
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT start_local, avg_speed_kmh, avg_hr, distance_km
+            FROM activities
+            WHERE distance_km >= 5
+              AND avg_hr > 0
+              AND avg_speed_kmh BETWEEN 5.0 AND 60.0
+              AND activity_type = 'cycling'
             ORDER BY start_local ASC
             """,
         ).fetchall()
@@ -597,7 +607,7 @@ def get_cycling_summary() -> dict[str, Any]:
     """Totals for the four cycling stat cards."""
     today = date.today()
     month_start = today.replace(day=1).isoformat()
-    week_start = (today - timedelta(days=today.weekday())).isoformat()
+    week_start = _week_start(today).isoformat()
     with get_connection() as conn:
         row = conn.execute(
             """
@@ -621,15 +631,15 @@ def get_cycling_weekly_distance(weeks: int = 16) -> list[dict[str, Any]]:
     cutoff = (date.today() - timedelta(weeks=weeks)).isoformat()
     with get_connection() as conn:
         rows = conn.execute(
-            """
+            f"""
             SELECT
-                TO_CHAR(DATE_TRUNC('week', start_local::date), 'YYYY-MM-DD') AS week_start,
-                ROUND(SUM(distance_km)::numeric, 1)                           AS total_km,
-                COUNT(*)                                                       AS ride_count
+                TO_CHAR({_SUNDAY_WEEK}, 'YYYY-MM-DD') AS week_start,
+                ROUND(SUM(distance_km)::numeric, 1)   AS total_km,
+                COUNT(*)                              AS ride_count
             FROM activities
             WHERE start_local >= %s AND distance_km > 0
               AND activity_type = 'cycling'
-            GROUP BY DATE_TRUNC('week', start_local::date)
+            GROUP BY {_SUNDAY_WEEK}
             ORDER BY week_start ASC
             """,
             (cutoff,),
@@ -674,9 +684,41 @@ def get_cycling_hr_trend(limit: int = 30) -> list[dict[str, Any]]:
     return [dict(r) for r in reversed(rows)]
 
 
+# ───────────────────── Training load (both sports) ───────────────────────
+
+
+def get_hr_sessions(days: int = 140) -> list[dict[str, Any]]:
+    """Both-sport sessions with the fields needed for HR-based training load.
+
+    Only sessions with an avg HR and a duration can carry a load, so we filter
+    to those. Oldest first.
+    """
+    cutoff = (date.today() - timedelta(days=days)).isoformat()
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT start_local, activity_type, duration_min, avg_hr, max_hr
+            FROM activities
+            WHERE start_local >= %s
+              AND avg_hr IS NOT NULL AND avg_hr > 0
+              AND duration_min IS NOT NULL AND duration_min > 0
+            ORDER BY start_local ASC
+            """,
+            (cutoff,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_observed_max_hr() -> int | None:
+    """Highest max HR ever recorded — a usable HRmax estimate for load/zones."""
+    with get_connection() as conn:
+        row = conn.execute("SELECT MAX(max_hr) AS m FROM activities").fetchone()
+    return int(row["m"]) if row and row.get("m") else None
+
+
 # ─────────────────────────── Weekly Plans ────────────────────────────────
 
-VALID_PLAN_STATUSES = ("proposed", "accepted", "archived")
+VALID_PLAN_STATUSES = ("proposed", "accepted", "rejected", "archived")
 
 
 def create_weekly_plan(week_start: str, plan_json: dict[str, Any]) -> int:
@@ -695,12 +737,12 @@ def create_weekly_plan(week_start: str, plan_json: dict[str, Any]) -> int:
 
 
 def list_weekly_plans(limit: int = 10) -> list[dict[str, Any]]:
-    """Return recent non-archived plans, newest first."""
+    """Return recent active plans (not rejected/archived), newest first."""
     with get_connection() as conn:
         rows = conn.execute(
             """
             SELECT * FROM weekly_plans
-            WHERE status != 'archived'
+            WHERE status NOT IN ('archived', 'rejected')
             ORDER BY created_at DESC
             LIMIT %s
             """,
@@ -900,6 +942,29 @@ def get_sleep_nights_summary() -> dict[str, Any]:
     return dict(row) if row else {}
 
 
+def get_weekly_hrv() -> list[dict[str, Any]]:
+    """Weekly-averaged overnight HRV (ms) from per-night data, oldest first.
+
+    HRV isn't in the 1-year weekly export — only in per-night data — so this
+    spans the nightly history (and grows as more nights are synced). Sunday-week
+    buckets, to match every other weekly aggregation.
+    """
+    bucket = "DATE_TRUNC('week', night_date::date + INTERVAL '1 day') - INTERVAL '1 day'"
+    with get_connection() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT TO_CHAR({bucket}, 'YYYY-MM-DD') AS week_start,
+                   ROUND(AVG(hrv_ms)::numeric, 0)  AS hrv,
+                   COUNT(hrv_ms)                   AS nights
+            FROM sleep_nights
+            WHERE hrv_ms IS NOT NULL
+            GROUP BY {bucket}
+            ORDER BY week_start ASC
+            """
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 # ───────────────────────────── Calories ──────────────────────────────────
 
 
@@ -942,6 +1007,57 @@ def get_calorie_dates() -> list[str]:
             "SELECT day_date FROM calories ORDER BY day_date DESC"
         ).fetchall()
     return [r["day_date"] for r in rows]
+
+
+def upsert_weight(day_date: str, weight_kg: float) -> None:
+    """Insert or overwrite one day's body weight (kg), keyed on day_date."""
+    if not day_date or weight_kg is None:
+        return
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO weight_log (day_date, weight_kg, created_at)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (day_date) DO UPDATE SET
+                weight_kg  = excluded.weight_kg,
+                created_at = excluded.created_at
+            """,
+            (day_date, float(weight_kg), datetime.utcnow().isoformat()),
+        )
+
+
+def get_weights(limit: int = 180) -> list[dict[str, Any]]:
+    """Recent body-weight entries, oldest first (for the trend + 7-day averages)."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT day_date, weight_kg FROM weight_log ORDER BY day_date DESC LIMIT %s",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in reversed(rows)]
+
+
+def delete_weight(day_date: str) -> None:
+    with get_connection() as conn:
+        conn.execute("DELETE FROM weight_log WHERE day_date = %s", (day_date,))
+
+
+def get_setting(key: str, default: str | None = None) -> str | None:
+    with get_connection() as conn:
+        row = conn.execute("SELECT value FROM app_settings WHERE key = %s", (key,)).fetchone()
+    return row["value"] if row and row["value"] is not None else default
+
+
+def set_setting(key: str, value: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO app_settings (key, value, updated_at)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (key) DO UPDATE SET
+                value = excluded.value, updated_at = excluded.updated_at
+            """,
+            (key, str(value), datetime.utcnow().isoformat()),
+        )
 
 
 def get_calories_days(limit: int = 60) -> list[dict[str, Any]]:
@@ -1064,11 +1180,30 @@ def get_food_log(log_date: str) -> list[dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
+def delete_food(name: str) -> bool:
+    """Remove a food from the personal library (keyed on lowercased name).
+    Logged portions already recorded in food_log are unaffected. Returns True
+    if a row was deleted."""
+    with get_connection() as conn:
+        cur = conn.execute("DELETE FROM foods WHERE name = %s", (name.strip().lower(),))
+        return cur.rowcount > 0
+
+
 def delete_food_log(entry_id: int) -> bool:
     """Remove one logged item (for corrections). Returns True if a row was deleted."""
     with get_connection() as conn:
         cur = conn.execute("DELETE FROM food_log WHERE id = %s", (entry_id,))
         return cur.rowcount > 0
+
+
+def delete_food_log_for(log_date: str, food_name: str) -> int:
+    """Remove every logged portion of one food on a day (for the grouped view)."""
+    with get_connection() as conn:
+        cur = conn.execute(
+            "DELETE FROM food_log WHERE log_date = %s AND food_name = %s",
+            (log_date, food_name),
+        )
+        return cur.rowcount
 
 
 def get_nutrition_day(log_date: str) -> dict[str, Any]:

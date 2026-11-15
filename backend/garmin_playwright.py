@@ -108,29 +108,41 @@ def export_activities(sports: list[str] | None = None) -> list[Path]:
 
 
 def _export_one_sport(page, sport: str, navigate: bool = True) -> Path:
-    """Export one sport's CSV.
+    """Export one sport's CSV, tolerating a slow or blank-loading activities page.
 
-    ``navigate`` is True when switching to a different sport: we reload the
-    filtered view, give the SPA a brief moment to apply the activity-type
-    filter, then export. (We deliberately avoid a 'networkidle' wait here —
-    Garmin's page polls in the background and rarely goes idle, so that wait
-    used to stall for ~20s. The short settle below is enough for the filtered
-    list to load.) For the first sport we're already on the page, so we skip
-    straight to the export.
+    Garmin's activities view is a heavy SPA that sometimes renders blank on the
+    first paint (empty list, just a spinner). The Export CSV button only exists
+    once the list has loaded, so we (a) wait for the activity list to actually
+    appear before hunting the button, and (b) if the button never shows, reload
+    the filtered view and try again a couple of times rather than giving up.
     """
     url = SPORT_URLS[sport]
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     dest = DOWNLOAD_DIR / f"garmin_sync_{sport}_{timestamp}.csv"
 
-    if navigate:
-        logger.info("Switching to %s view…", sport)
-        page.goto(url, wait_until="domcontentloaded")
-        page.wait_for_timeout(2_000)  # let the SPA apply the activity-type filter
+    export_btn = None
+    max_tries = 3
+    for attempt in range(1, max_tries + 1):
+        # Reload the filtered view when switching sports, or on any retry.
+        if navigate or attempt > 1:
+            logger.info("Loading %s view (attempt %d/%d)…", sport, attempt, max_tries)
+            page.goto(url, wait_until="domcontentloaded")
 
-    logger.info("Waiting for Export CSV button (%s)…", sport)
-    export_btn = _wait_for_export_button(page, timeout=45_000)
+        _wait_for_activities_ready(page)      # let the list render first
+        export_btn = _wait_for_export_button(page, timeout=30_000)
+        if export_btn is not None:
+            break
+        logger.warning("Export button not found for %s (attempt %d/%d) — reloading…",
+                       sport, attempt, max_tries)
+        page.wait_for_timeout(1_500)
+
     if export_btn is None:
-        raise RuntimeError(f"Export CSV button not found for {sport}.")
+        dump = _dump_debug(page, sport)
+        raise RuntimeError(
+            f"Export CSV button never appeared for {sport} after {max_tries} tries — "
+            "Garmin's page was slow, stuck loading, or its layout changed. "
+            f"Saved a screenshot + page HTML to {dump} for diagnosis. Try Sync again."
+        )
 
     logger.info("Exporting %s…", sport)
     with page.expect_download(timeout=60_000) as dl_handle:
@@ -138,6 +150,42 @@ def _export_one_sport(page, sport: str, navigate: bool = True) -> Path:
     dl_handle.value.save_as(dest)
     logger.info("%s CSV saved → %s", sport, dest)
     return dest
+
+
+def _dump_debug(page, sport: str) -> Path:
+    """Save a screenshot + page HTML when export fails, so a blind failure
+    becomes something we can actually look at. Returns the debug directory."""
+    debug_dir = DOWNLOAD_DIR / "debug"
+    debug_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    try:
+        page.screenshot(path=str(debug_dir / f"{sport}_{stamp}.png"), full_page=True)
+    except Exception:  # noqa: BLE001
+        logger.warning("Could not save debug screenshot", exc_info=True)
+    try:
+        (debug_dir / f"{sport}_{stamp}.html").write_text(
+            page.content(), encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        logger.warning("Could not save debug HTML", exc_info=True)
+    logger.warning("Saved export-failure debug for %s → %s", sport, debug_dir)
+    return debug_dir
+
+
+def _wait_for_activities_ready(page, timeout: int = 25_000) -> None:
+    """Wait for the activity list to render, so the Export control is present.
+
+    Each list row links to an individual activity; once one is visible the SPA
+    has finished loading. This is best-effort: if the list never appears we do
+    NOT fail here — the caller's export-button hunt (with its reload-retry) takes
+    over — so a wrong/changed selector degrades gracefully instead of breaking.
+    """
+    try:
+        page.locator("a[href*='/activity/']").first.wait_for(
+            state="visible", timeout=timeout)
+        logger.info("Activities list loaded.")
+    except PWTimeoutError:
+        logger.warning("Activities list slow to load; proceeding to export hunt.")
+        page.wait_for_timeout(2_000)
 
 
 _YEAR_VIEW_LABELS = ["1 έτος", "1 year", "1 Year"]
@@ -148,6 +196,46 @@ _SLEEP_VIEWS: dict[str, tuple[list[str], str, str]] = {
     "night":  (_DAY_VIEW_LABELS,  "1-day",  "garmin_sync_sleep_night"),
     "weekly": (_YEAR_VIEW_LABELS, "1-year", "garmin_sync_sleep"),
 }
+
+
+# Text Garmin shows on its transient server-error page.
+_GARMIN_CRASH_MARKERS = ["Looks Like We Crashed", "pick ourselves up",
+                         "Κάτι πήγε στραβά"]
+# Any range tab proves the real sleep page (not the crash page) has rendered.
+_SLEEP_RANGE_LABELS = _DAY_VIEW_LABELS + _YEAR_VIEW_LABELS
+
+
+def _is_garmin_crash_page(page) -> bool:
+    try:
+        body = page.inner_text("body", timeout=3_000)
+    except Exception:  # noqa: BLE001
+        return False
+    return any(marker in body for marker in _GARMIN_CRASH_MARKERS)
+
+
+def _wait_for_sleep_ready(page, max_tries: int = 4) -> bool:
+    """Reload past Garmin's transient crash page until the real sleep page —
+    with its range tabs — is showing. Returns False if it never recovers."""
+    for attempt in range(1, max_tries + 1):
+        if _is_garmin_crash_page(page):
+            logger.warning("Garmin sleep page crashed (attempt %d/%d) — waiting "
+                           "then reloading…", attempt, max_tries)
+        else:
+            # Not the crash page — is a range tab actually present yet?
+            for label in _SLEEP_RANGE_LABELS:
+                loc = page.get_by_text(label, exact=True)
+                try:
+                    if loc.count() and loc.first.is_visible():
+                        logger.info("Sleep page ready (found %r).", label)
+                        return True
+                except Exception:  # noqa: BLE001
+                    continue
+            logger.info("Sleep page loaded but range tabs not ready yet "
+                        "(attempt %d/%d)…", attempt, max_tries)
+        if attempt < max_tries:
+            page.wait_for_timeout(3_000 * attempt)   # back off: 3s, 6s, 9s
+            page.goto(SLEEP_URL, wait_until="domcontentloaded")
+    return False
 
 
 def export_sleep_views(views: list[str]) -> dict[str, Path]:
@@ -173,6 +261,18 @@ def export_sleep_views(views: list[str]) -> dict[str, Path]:
             logger.info("Post-login redirect — returning to sleep page…")
             page.goto(SLEEP_URL, wait_until="domcontentloaded")
 
+        # Garmin's sleep endpoint sometimes serves a "Looks Like We Crashed"
+        # page (a transient server error). Reload past it before exporting,
+        # otherwise the range tabs / export menu simply aren't there.
+        if not _wait_for_sleep_ready(page):
+            _dump_debug(page, "sleep_crash")
+            context.close()
+            raise RuntimeError(
+                "Garmin's sleep page is temporarily down (it served a "
+                "\"Looks Like We Crashed\" error). This is on Garmin's side, "
+                "not the app — wait a minute and try Sync Sleep again."
+            )
+
         for view in views:
             labels, name, prefix = _SLEEP_VIEWS[view]
             try:
@@ -190,13 +290,15 @@ def export_sleep_views(views: list[str]) -> dict[str, Path]:
                 logger.info("Sleep %s CSV saved → %s", name, dest)
             except Exception:  # noqa: BLE001 — keep going so one bad view
                 logger.exception("Sleep export failed for %s", view)
+                _dump_debug(page, f"sleep_{view}")
 
         context.close()
 
     if not saved:
         raise RuntimeError(
-            "No sleep CSVs were exported. The page may have been slow, or you "
-            "may need to log in."
+            "No sleep CSVs were exported. Garmin's sleep page was slow, its "
+            "export menu changed, or you need to log in. Saved a screenshot + "
+            f"page HTML to {DOWNLOAD_DIR / 'debug'} for diagnosis. Try again."
         )
     return saved
 
@@ -387,17 +489,39 @@ def _launch_persistent(pw):
         "args": ["--disable-blink-features=AutomationControlled"],
     }
 
-    # 1 & 2 — Playwright auto-locates Chrome / Edge
-    for channel in ("chrome", "msedge"):
+    def _try(desc: str, **launch_kwargs):
+        """Launch, then PROVE the context is usable by opening a page.
+
+        System Chrome/Edge can "succeed" at launch but immediately hand the
+        profile off to an already-open browser of the same kind, killing the
+        automation target — so new_page() throws TargetClosedError a moment
+        later. We probe here and reject such a dead context, letting the caller
+        fall through to the next (ultimately the isolated bundled Chromium)."""
         try:
             ctx = pw.chromium.launch_persistent_context(
-                str(PROFILE_DIR), channel=channel, **common_kwargs
-            )
-            logger.info("Launched persistent context via channel=%s", channel)
-            _mask_webdriver(ctx)
+                str(PROFILE_DIR), **common_kwargs, **launch_kwargs)
+        except Exception as exc:  # noqa: BLE001 — browser not installed, etc.
+            logger.info("Launch failed (%s): %s", desc, exc)
+            return None
+        try:
+            ctx.new_page().close()   # probe: dead contexts raise here
+        except Exception as exc:  # noqa: BLE001 — the hand-off death
+            logger.warning("Context via %s closed on probe (%s) — trying next.",
+                           desc, exc)
+            try:
+                ctx.close()
+            except Exception:  # noqa: BLE001
+                pass
+            return None
+        logger.info("Launched persistent context via %s", desc)
+        _mask_webdriver(ctx)
+        return ctx
+
+    # 1 & 2 — Playwright auto-locates Chrome / Edge
+    for channel in ("chrome", "msedge"):
+        ctx = _try(f"channel={channel}", channel=channel)
+        if ctx is not None:
             return ctx
-        except Exception:
-            continue
 
     # 3 — explicit paths for per-user Chrome / system Edge
     _PATHS = [
@@ -408,21 +532,20 @@ def _launch_persistent(pw):
     ]
     for exe in _PATHS:
         if Path(exe).exists():
-            try:
-                ctx = pw.chromium.launch_persistent_context(
-                    str(PROFILE_DIR), executable_path=exe, **common_kwargs
-                )
-                logger.info("Launched persistent context via executable_path=%s", exe)
-                _mask_webdriver(ctx)
+            ctx = _try(f"executable_path={exe}", executable_path=exe)
+            if ctx is not None:
                 return ctx
-            except Exception:
-                continue
 
-    # 4 — bundled Chromium (requires ``playwright install chromium``)
+    # 4 — bundled Chromium: a separate binary that never collides with the
+    # user's everyday Chrome, so it can't be killed by the hand-off above.
     logger.info("Falling back to Playwright bundled Chromium (persistent)")
-    ctx = pw.chromium.launch_persistent_context(str(PROFILE_DIR), **common_kwargs)
-    _mask_webdriver(ctx)
-    return ctx
+    ctx = _try("bundled Chromium")
+    if ctx is not None:
+        return ctx
+    raise RuntimeError(
+        "Could not open a browser for Garmin sync. If your everyday Chrome is "
+        "open, the bundled browser is used automatically — but it must be "
+        "installed once with: python -m playwright install chromium")
 
 
 def _mask_webdriver(context) -> None:
@@ -464,31 +587,75 @@ def _wait_for_login(page) -> None:
     logger.info("Login detected — resuming sync…")
 
 
-def _wait_for_export_button(page, timeout: int = 45_000):
-    """Wait for the Export CSV button to become visible, then return it.
+# Controls that open Garmin's activity-list overflow / settings menu, which is
+# where "Export to CSV" lives. Garmin hides the export item until this is opened,
+# so wait_for(state="visible") on the export text alone times out forever.
+_MENU_TRIGGER_LABELS = [
+    "More", "Options", "Settings", "Actions", "Menu",
+    "Περισσότερα", "Επιλογές", "Ρυθμίσεις",   # Greek
+]
 
-    Tries each known locale label in turn, then falls back to any
-    button/link containing the text "CSV".  Returns None if nothing
-    appears within the timeout.
-    """
-    # Try each locale label — give the first one the full timeout,
-    # shorter slots for the rest (they share the remaining budget).
-    per_label = max(5_000, timeout // max(len(_EXPORT_LABELS), 1))
-    for label in _EXPORT_LABELS:
+
+def _try_open_export_menu(page) -> None:
+    """Best-effort: click the overflow/settings control so a hidden Export item
+    becomes visible. Safe to call even when the button is already on screen."""
+    for label in _MENU_TRIGGER_LABELS:
         try:
-            loc = page.get_by_text(label, exact=True)
-            loc.first.wait_for(state="visible", timeout=per_label)
-            logger.info("Export button found: %r", label)
-            return loc.first
-        except PWTimeoutError:
+            loc = page.get_by_role("button", name=label)
+            if loc.count() and loc.first.is_visible():
+                loc.first.click(timeout=2_000)
+                page.wait_for_timeout(400)
+                logger.info("Opened activity menu via %r", label)
+                return
+        except Exception:  # noqa: BLE001 — never let the probe break the sync
             continue
 
-    # Fallback: any visible button or link containing "CSV"
-    try:
-        loc = page.locator("button, a").filter(has_text="CSV")
-        loc.first.wait_for(state="visible", timeout=10_000)
+
+def _find_export_locator(page):
+    """Return a locator for the Export CSV item if one exists in the DOM, else
+    None. Matches on the known locale labels, then any element mentioning CSV."""
+    for label in _EXPORT_LABELS:
+        loc = page.get_by_text(label, exact=True)
+        if loc.count():
+            return loc.first
+    loc = page.locator("button, a, [role='menuitem']").filter(has_text="CSV")
+    if loc.count():
         return loc.first
-    except PWTimeoutError:
-        pass
+    return None
+
+
+def _wait_for_export_button(page, timeout: int = 45_000):
+    """Wait for the Export CSV control to become clickable, then return it.
+
+    Garmin puts "Export to CSV" inside an overflow/settings menu that is hidden
+    until opened, so we (1) look for a visible export item directly, and if none
+    is visible, (2) open the menu and look again. Returns None if nothing
+    clickable appears within the timeout.
+    """
+    deadline = timeout
+    step = max(3_000, timeout // 6)
+    waited = 0
+    while waited < deadline:
+        loc = _find_export_locator(page)
+        if loc is not None:
+            try:
+                loc.wait_for(state="visible", timeout=1_000)
+                logger.info("Export button visible.")
+                return loc
+            except PWTimeoutError:
+                # Exists in the DOM but hidden — it's behind a closed menu.
+                _try_open_export_menu(page)
+                loc = _find_export_locator(page)
+                if loc is not None:
+                    try:
+                        loc.wait_for(state="visible", timeout=2_000)
+                        logger.info("Export button visible after opening menu.")
+                        return loc
+                    except PWTimeoutError:
+                        pass
+        # Not there yet (list still rendering) — open any menu and wait a bit.
+        _try_open_export_menu(page)
+        page.wait_for_timeout(step)
+        waited += step
 
     return None

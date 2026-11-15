@@ -18,7 +18,8 @@ from typing import Any
 
 from anthropic import Anthropic
 
-from . import config, db
+from . import config, db, training_load
+from .agent import run_tool_loop
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,7 @@ The user's training and recovery data lives in a local database. Use the provide
 - recent SLEEP — nightly recovery (sleep score, total/deep/REM duration, HRV in ms, resting HR)
 - recent daily CALORIES BURNED (total, active, resting) — energy-expenditure context
 - logged FOOD INTAKE — what the user ate each day (calories eaten + protein/fat/carbs grams)
+- TRAINING LOAD & ACWR (get_training_load) — weekly Banister TRIMP load (runs + rides combined) and the acute:chronic workload ratio, the overtraining-risk signal
 - active race goals, and personal-record progression at standard distances
 
 When the user asks a question, ground your answer in their actual numbers — pull the data with tools before answering. Don't speculate from general knowledge when the data is one tool call away.
@@ -59,6 +61,7 @@ Treat the athlete holistically — running is the goal, but cycling and sleep ch
 - CYCLING is cross-training that adds real aerobic load and fatigue. Count it toward the week's total load. After a long or hard ride, don't stack a hard run the next day. An easy spin can serve as active recovery. If cycling volume is high, the running plan has less room before overreaching.
 - SLEEP & HRV are the recovery signal. Short sleep, a downward HRV trend, or elevated resting HR mean the body is under-recovered → bias toward easier sessions, more rest, or moving hard workouts later. Good sleep and rising HRV mean the athlete can absorb harder work. Always sanity-check intensity against recent recovery.
 - ENERGY BALANCE & FUELLING — the user logs the food they eat. Compare intake (get_recent_nutrition: calories + protein/fat/carbs eaten) against what they burn (calories burned + training). Flag a large deficit during hard training, low protein for recovery, or days with no food logged. Intake data may be sparse — say so plainly if it's thin rather than guessing.
+- TRAINING LOAD & ACWR (get_training_load) — the acute:chronic workload ratio is the overtraining gauge. ACWR above ~1.5 means weekly load has spiked well past the athlete's 4-week base → high injury/overtraining risk, pull back; 0.8-1.3 is the safe building zone; below 0.8 is detraining. Read it WITH recovery: rising load while HRV trends down (or resting HR rises) is the clearest "back off" signal. Check training load before prescribing or approving hard weeks.
 
 Your responsibilities:
 1. Validate training — flag when effort doesn't match intent (e.g. easy runs with HR too high), AND when running load ignores cycling fatigue or poor recovery.
@@ -204,6 +207,19 @@ TOOLS: list[dict[str, Any]] = [
             "required": ["distance"],
         },
     },
+    {
+        "name": "get_training_load",
+        "description": (
+            "Get the user's current training load and overtraining risk. Returns "
+            "the weekly Banister TRIMP load (runs + rides combined, HR-based), the "
+            "acute:chronic workload ratio (ACWR) with a status (low / optimal / "
+            "high / very high — safe building zone 0.8-1.3, injury risk above 1.5), "
+            "and the weekly HRV / resting-HR recovery trend. Check this before "
+            "prescribing hard sessions or judging whether the athlete is fresh, "
+            "building safely, or overreaching."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
 ]
 
 
@@ -271,6 +287,20 @@ def _run_tool(name: str, args: dict[str, Any]) -> str:
         matches.sort(key=lambda r: r["date"])
         return json.dumps(matches)
 
+    if name == "get_training_load":
+        data = training_load.compute(weeks=8)
+        return json.dumps({
+            "acwr": data["acwr"],
+            "weekly_load": [
+                {"week": w["week_start"], "run": w["run_load"], "ride": w["ride_load"],
+                 "total": w["load"], "hrv": w["hrv"], "resting_hr": w["resting_hr"]}
+                for w in data["weeks"]
+            ],
+            "hr_params": data["params"],
+            "note": ("TRIMP is HR-based; absolute load depends on an estimated max HR, "
+                     "so the trend and the ACWR ratio are the reliable signals."),
+        }, default=str)
+
     return json.dumps({"error": f"unknown tool: {name}"})
 
 
@@ -311,72 +341,15 @@ def chat(
         }
     )
 
-    final_text = ""
-
-    for iteration in range(MAX_TOOL_ITERATIONS):
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=4096,
-            system=[
-                {
-                    "type": "text",
-                    "text": system_text,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
-            tools=TOOLS,
-            thinking={"type": "adaptive"},
-            output_config={"effort": "high"},
-            messages=messages,
-        )
-
-        # Preserve the full assistant turn (including tool_use blocks) so the
-        # next iteration sees the model's prior intent.
-        messages.append({"role": "assistant", "content": response.content})
-
-        if response.stop_reason == "tool_use":
-            tool_results = []
-            for block in response.content:
-                if getattr(block, "type", None) != "tool_use":
-                    continue
-                try:
-                    result = _run_tool(block.name, dict(block.input or {}))
-                    is_error = False
-                except Exception as e:  # noqa: BLE001
-                    logger.exception("Tool %s failed", block.name)
-                    result = json.dumps({"error": f"{type(e).__name__}: {e}"})
-                    is_error = True
-                tool_results.append(
-                    {
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": result,
-                        "is_error": is_error,
-                    }
-                )
-            messages.append({"role": "user", "content": tool_results})
-            continue
-
-        if response.stop_reason == "pause_turn":
-            # Server-side tool sampling loop paused; re-send to continue.
-            continue
-
-        # end_turn or anything else — extract text and return.
-        text_blocks = [
-            b.text for b in response.content if getattr(b, "type", None) == "text"
-        ]
-        final_text = "\n\n".join(text_blocks).strip()
-        if response.stop_reason not in ("end_turn",):
-            logger.warning(
-                "Unexpected stop_reason %r at iteration %d",
-                response.stop_reason,
-                iteration,
-            )
-        break
-    else:
-        logger.warning("Coach loop hit MAX_TOOL_ITERATIONS without end_turn")
-        final_text = (
-            "(coach exceeded internal tool-use iteration limit — try a simpler question)"
-        )
-
-    return final_text or "(empty response)"
+    return run_tool_loop(
+        client=client,
+        model=MODEL,
+        system_text=system_text,
+        tools=TOOLS,
+        run_tool=_run_tool,
+        messages=messages,
+        max_iterations=MAX_TOOL_ITERATIONS,
+        label="coach",
+        thinking={"type": "adaptive"},
+        output_config={"effort": "high"},
+    )
