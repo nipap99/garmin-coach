@@ -244,7 +244,7 @@ Gotcha: `db.get_recent_activities()` defaults to `LIMIT 200`. Pass a high `limit
   garminconnect, mcp. (anthropic, playwright and pillow were removed.)
 - `.env`: GARMIN_EMAIL, GARMIN_PASSWORD, GARMIN_TOKEN_DIR, DATABASE_URL. An old
   ANTHROPIC_API_KEY line there is now unused and can be deleted.
-- Git: `main` + branch `cleanup-2026-11-15` (this restructure). Remote `origin` on GitHub.
+- Git: work on `main` (the 2026-11-15 restructure was merged in). Remote `origin` on GitHub.
 
 ---
 
@@ -268,7 +268,7 @@ Gotcha: `db.get_recent_activities()` defaults to `LIMIT 200`. Pass a high `limit
       Mar 2027 (checkpoint), **half 1:19:00** by end May 2027 (**race**, exact date TBC: update
       the goal's date once entered). `coach_snapshot.goals` shows the VDOT/seconds gap to each.
 - [ ] Restart **Claude Desktop** (and start a new Claude Code session) so the new MCP tools load.
-- [ ] Merge branch `cleanup-2026-11-15` into `main` once the next Sunday report looks right.
+- [x] Restructure merged into `main` (2026-11-15). Not pushed to GitHub yet.
 - [ ] Empty `_archive/2026-11-15/` after about a month if nothing is missed.
 - Ideas not built yet:
   - 4-week block counter (automatic cutback weeks).
