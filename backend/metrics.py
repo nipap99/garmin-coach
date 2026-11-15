@@ -457,6 +457,39 @@ def weekly_km(weeks: int = 4) -> list[dict[str, Any]]:
     return out
 
 
+GOAL_KM = {"5k": 5.0, "10k": 10.0, "half_marathon": 21.0975, "marathon": 42.195}
+
+
+def goal_progress() -> list[dict[str, Any]]:
+    """Each active goal vs today's prediction, as a VDOT gap and seconds gap.
+
+    Goal notes start with RACE (taper for it) or CHECKPOINT (no taper)."""
+    best = _best_effort()
+    out = []
+    for g in sorted(db.list_goals(status="active"), key=lambda g: g.get("target_date") or "9999"):
+        km = GOAL_KM.get(g["distance"])
+        if not km or not g.get("target_time_seconds"):
+            continue
+        tmin = g["target_time_seconds"] / 60
+        need = vdot_from(km, tmin)
+        row = {"distance": g["distance"], "target": f"{int(tmin // 60)}:{int(tmin % 60):02d}:{int(round(tmin * 60 % 60)):02d}"
+               if tmin >= 60 else f"{int(tmin)}:{int(round(tmin * 60 % 60)):02d}",
+               "target_pace": fmt_pace(tmin / km), "by": g.get("target_date"),
+               "kind": "race" if (g.get("notes") or "").upper().startswith("RACE") else "checkpoint",
+               "vdot_needed": round(need, 1)}
+        if g.get("target_date"):
+            row["weeks_left"] = max(0, (date.fromisoformat(g["target_date"]) - date.today()).days // 7)
+        if best:
+            v = best[0] if km <= 10 else best[1]       # endurance VDOT for half/marathon
+            pred = _race_time(v, km)
+            row.update({"vdot_now": round(v, 1), "vdot_gap": round(need - v, 1),
+                        "predicted_now": f"{int(pred // 60)}:{int(pred % 60):02d}:{int(round(pred * 60 % 60)):02d}"
+                        if pred >= 60 else f"{int(pred)}:{int(round(pred * 60 % 60)):02d}",
+                        "gap_seconds": int(round((pred - tmin) * 60))})
+        out.append(row)
+    return out
+
+
 def snapshot() -> dict[str, Any]:
     """One call with everything a check-in needs."""
     tl = training_load.compute(weeks=6)
@@ -472,7 +505,7 @@ def snapshot() -> dict[str, Any]:
         "readiness": readiness(),
         "long_run": long_run_status(),
         "current_paces": current_paces(),
-        "goals": db.list_goals(status="active"),
+        "goals": goal_progress(),
         "last_week": week_summary((this_mon - timedelta(weeks=1)).isoformat()),
         "this_week": week_summary(this_mon.isoformat()),
     }

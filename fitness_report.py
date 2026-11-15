@@ -613,7 +613,7 @@ def page_overview(pdf, d, ai):
     sc = {"optimal": CYAN, "low": WARN, "high": DOWN, "caution": WARN}.get(a.get("status"), TEXT)
     CW = pdf.w - pdf.l_margin - pdf.r_margin
     y = _tiles(pdf, pdf.l_margin, pdf.get_y(), CW, [
-        (f"{tot_km:.0f} km", f"{len(runs)} runs", ACCENT),
+        (f"{tot_km:.0f} km", f"{(d.get('week') or {}).get('sessions', len(runs))} runs", ACCENT),
         (str(vo2) if vo2 else "—", "VO2 max", TEXT),
         (f"{avg_hrv} ms" if avg_hrv else "—", "Avg HRV", CYAN),
         (f"{a.get('value')}", f"ACWR · {a.get('status')}", sc),

@@ -164,8 +164,9 @@ dashboard weekly charts too).
 
 ## 7. Coaching model (summary; full rules in `coaching/coaching_rules.md`)
 
-- **Goals in priority order:** 5k → 10k → half. Physique is secondary. Real targets go in the
-  Goals tab. Taper only for confirmed races.
+- **Goals in priority order:** 5k → 10k → half. Physique is secondary.
+- **Targets:** 10k 38:00 (Dec 2026, checkpoint) · 5k 17:40 (Mar 2027, checkpoint) · half 1:19:00
+  (May 2027, the one **race**). Taper only for the half.
 - **Week:** Mon easy+strides · **Tue VO2 intervals** · Wed medium-long easy · **Thu threshold** ·
   Fri easy/bike · **Sat long run + HM block** · Sun rest. Max 3 hard days. Protect the long run.
 - **Volume:** build toward 65–75 km/wk, ≤10 %/wk, cutback every 4th week, ACWR < 1.4.
@@ -210,7 +211,7 @@ Tabs:
 | `calories` | Garmin daily burn |
 | `foods`, `food_log` | food library + daily log |
 | `weight_log`, `app_settings` | Calibration tab |
-| `goals` | race goals (**currently empty: set real ones**) |
+| `goals` | race goals; `notes` starts with `RACE` (taper) or `CHECKPOINT` (no taper) |
 | `weekly_plans` | Sunday-report plans (`plan_json.source = "weekly-report"`), read by Today + plan check |
 | `chat_messages` | legacy, from the retired chats (unused) |
 
@@ -263,8 +264,9 @@ Gotcha: `db.get_recent_activities()` defaults to `LIMIT 200`. Pass a high `limit
 
 ## 14. Open items
 
-- [ ] **Set real goals** in the Goals tab (or tell Claude the targets). `goals` is empty, so
-      the report has no countdown or target-vs-prediction.
+- [x] Real goals set 2026-11-15: **10k 38:00** by end Dec 2026 (checkpoint), **5k 17:40** by end
+      Mar 2027 (checkpoint), **half 1:19:00** by end May 2027 (**race**, exact date TBC: update
+      the goal's date once entered). `coach_snapshot.goals` shows the VDOT/seconds gap to each.
 - [ ] Restart **Claude Desktop** (and start a new Claude Code session) so the new MCP tools load.
 - [ ] Merge branch `cleanup-2026-11-15` into `main` once the next Sunday report looks right.
 - [ ] Empty `_archive/2026-11-15/` after about a month if nothing is missed.

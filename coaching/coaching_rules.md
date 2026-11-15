@@ -12,12 +12,22 @@ file. Nowhere else.** Last updated: 2026-11-15.
 
 The physique goal (leaner and athletic) is **secondary**. Performance comes first.
 
-- Real race targets live in the app's **Goals** table (MCP tool `goals`). If it's empty,
-  don't invent races. Coach toward the priorities above and use the `current_paces`
-  predictions as the yardstick.
-- Placeholder races: taper **only** for a race the athlete has confirmed in `goals` or
-  `week_notes.txt`. There is no peak/taper for examples or self-tests.
-- Reference goal paces (aspirational): 5k 3:34/km (17:50), HM 3:45/km (1:19).
+Targets (set 2026-11-15; live in the **Goals** table, and `coach_snapshot.goals` shows the
+gap to each):
+
+| Goal | Target | Pace | By | Kind | VDOT needed (now 54.2) |
+|---|---|---|---|---|---|
+| 10k | **38:00** | 3:48/km | end Dec 2026 | checkpoint: no taper, a hard effort on a normal week | 55.2 |
+| 5k | **17:40** | 3:32/km | end Mar 2027 | checkpoint: no taper | 57.6 |
+| Half | **1:19:00** | 3:45/km | end May 2027 | **RACE: taper** for it (exact date TBC) | 59.3 |
+
+- The half is the season's one real race, so the build peaks toward late May. The 10k and
+  5k checkpoints are fitness tests along the way: slot them on a Tuesday or Saturday as
+  that week's quality session, with no taper and no extra hard day.
+- Judge progress by `vdot_gap` and `gap_seconds`, not by feel. The half needs the biggest
+  jump: about +7 endurance VDOT, which mostly comes from volume and long runs. That's why
+  protecting the long run and the 65–75 km/wk build matter most.
+- If a target looks out of reach by its date, say so honestly and propose an interim target.
 
 ## 2. The week (Mon–Sat running, Sunday = the only rest day)
 
