@@ -1430,7 +1430,7 @@ async function initToday() {
 
   // ── Energy balance (eaten − burned) ────────────────────────────────────
   try {
-    renderBalance(await fetch('/stats/energy-balance').then(r => r.json()));
+    renderBalance(await fetch('/stats/energy-balance?days=7').then(r => r.json()));
   } catch (e) { /* leave the section empty on error */ }
 
   // ── Training load + recovery (TRIMP · runs + rides vs HRV) ──────────────
