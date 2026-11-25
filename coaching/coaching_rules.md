@@ -2,7 +2,7 @@
 
 Every coach reads this file: the Sunday report task, the `run-analyst` subagent, and the
 Claude Desktop chat (MCP tool `coaching_rules`). **To change how you're coached, edit this
-file. Nowhere else.** Last updated: 2026-11-15.
+file. Nowhere else.** Last updated: 2026-11-19.
 
 ## 1. Goals (priority order)
 
@@ -47,6 +47,8 @@ Hard rules:
   put it on Tuesday in place of the intervals.
 - **Thursday is threshold, not VO2.** If threshold reps drift to 5k pace or HR goes above ~175,
   that's too hard. Slow down.
+  - Note (2026-11-19): 5x1 km @ 4:11, HR 169 (max 180), well controlled, but 7 s/km slower than
+    the 4:04 target. Next Thursday, run the reps closer to **4:05**.
 - A hard run on Sunday is off-plan. Flag it.
 - Strength is secondary: 2 light sessions on Tue/Thu. Cut strength before cutting running.
 

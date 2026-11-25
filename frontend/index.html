@@ -1232,11 +1232,11 @@ async function loadWeight(){
       const modeTag = d.activity_mode === 'dynamic' ? 'auto' : 'manual';
       let note = '';
       if (d.activity_mode === 'dynamic' && d.garmin_tdee != null){
-        note = `<div style="font-size:0.78rem;color:var(--muted);margin-top:0.45rem">&times;${d.activity} computed from Garmin's measured burn (<strong>${d.garmin_tdee.toLocaleString()} kcal/day</strong>) ÷ your BMR — it self-adjusts to each week's load.</div>`;
+        note = `<div style="font-size:0.78rem;color:var(--muted);margin-top:0.45rem">&times;${d.activity} computed from your BMR + Garmin's active burn (<strong>${d.garmin_tdee.toLocaleString()} kcal/day</strong>) ÷ your BMR — it self-adjusts to each week's load. Garmin's own flat resting figure runs ~330 kcal high, so the formula BMR replaces it.</div>`;
       } else if (d.maintenance != null && d.garmin_tdee != null){
         const diff = d.garmin_tdee - d.maintenance;
         const tag = Math.abs(diff) <= 150 ? 'in line with' : (diff>0 ? `${Math.abs(diff).toLocaleString()} kcal above` : `${Math.abs(diff).toLocaleString()} kcal below`);
-        note = `<div style="font-size:0.78rem;color:var(--muted);margin-top:0.45rem">Garmin's measured burn averages <strong>${d.garmin_tdee.toLocaleString()} kcal/day</strong> — ${tag} your manual estimate (Auto would use ×${d.dynamic_factor}).</div>`;
+        note = `<div style="font-size:0.78rem;color:var(--muted);margin-top:0.45rem">Your measured burn (formula BMR + Garmin active) averages <strong>${d.garmin_tdee.toLocaleString()} kcal/day</strong> — ${tag} your manual estimate (Auto would use ×${d.dynamic_factor}).</div>`;
       }
       comp.innerHTML =
         `<div class="weight-stats">`+

@@ -160,7 +160,8 @@ def weight_balance():
         lbm = basis_kg * (1 - bodyfat / 100.0)
         bmr = 370 + 21.6 * lbm
 
-    # Garmin-measured burn: avg of complete days' total_cal over the current 7 days.
+    # Burn: avg of complete days' total_cal over the current 7 days. total_cal is
+    # already corrected (formula BMR + Garmin active), see db._correct_resting.
     g_burns = [float(cal[d]["total_cal"]) for i in range(7)
                if (d := (today - timedelta(days=i)).isoformat()) in cal
                and cal[d].get("total_cal") not in (None, "")

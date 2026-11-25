@@ -1059,30 +1059,78 @@ def set_setting(key: str, value: str) -> None:
         )
 
 
+def get_bmr_formula() -> int | None:
+    """Resting burn from the Katch-McArdle formula: 370 + 21.6 x lean mass (kg).
+
+    Lean mass = 7-day average body weight x (1 - body-fat %). Returns None until a
+    weight is logged. Used to correct Garmin's resting calories (see below)."""
+    weights = get_weights(limit=30)
+    if not weights:
+        return None
+    cutoff = (date.today() - timedelta(days=6)).isoformat()
+    recent = [float(w["weight_kg"]) for w in weights if w["day_date"] >= cutoff]
+    kg = sum(recent) / len(recent) if recent else float(weights[-1]["weight_kg"])
+    bodyfat = float(get_setting("bodyfat_pct", "14") or 14)
+    return round(370 + 21.6 * kg * (1 - bodyfat / 100.0))
+
+
+def _correct_resting(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Swap Garmin's resting calories for the formula BMR; keep Garmin's active burn.
+
+    Garmin reports a flat resting figure (~1,940 kcal/day for this athlete) that sits
+    ~330 kcal above the Katch-McArdle BMR (~1,610). Checked 2026-11-25: intake minus the
+    weight trend put real maintenance at ~2,830 kcal/day, and formula BMR + Garmin active
+    gives ~2,820, while Garmin's own total says ~3,150. So the active burn is trusted and
+    only the resting part is replaced.
+
+    The correction is a ratio (formula BMR / Garmin's usual full-day resting), so today's
+    unfinished day, where Garmin's resting is still accruing, stays proportional. The
+    original numbers stay on each row as garmin_resting_cal / garmin_total_cal.
+    Setting ``calorie_resting_source`` = 'garmin' switches the correction off."""
+    if (get_setting("calorie_resting_source", "formula") or "formula") != "formula":
+        return rows
+    bmr = get_bmr_formula()
+    full = sorted(float(r["resting_cal"]) for r in rows
+                  if r.get("resting_cal") and float(r["resting_cal"]) >= 1500)
+    if not bmr or not full:
+        return rows
+    ratio = bmr / full[len(full) // 2]          # median full-day Garmin resting
+    for r in rows:
+        if r.get("resting_cal") is None:
+            continue
+        r["garmin_resting_cal"] = r["resting_cal"]
+        r["garmin_total_cal"] = r.get("total_cal")
+        r["resting_cal"] = round(float(r["resting_cal"]) * ratio)
+        if r.get("activity_cal") is not None:
+            r["total_cal"] = int(r["activity_cal"]) + r["resting_cal"]
+    return rows
+
+
 def get_calories_days(limit: int = 60) -> list[dict[str, Any]]:
-    """Return the most recent N days, oldest first (for charts)."""
+    """Return the most recent N days, oldest first (for charts).
+
+    resting_cal / total_cal are the corrected figures (formula BMR + Garmin active);
+    see ``_correct_resting``."""
     with get_connection() as conn:
         rows = conn.execute(
             "SELECT * FROM calories ORDER BY day_date DESC LIMIT %s",
             (limit,),
         ).fetchall()
-    return [dict(r) for r in reversed(rows)]
+    return _correct_resting([dict(r) for r in reversed(rows)])
 
 
 def get_calories_summary() -> dict[str, Any]:
-    """Averages over the last 30 days for the calories stat cards."""
-    with get_connection() as conn:
-        row = conn.execute(
-            """
-            SELECT
-                COUNT(*)                                AS days_tracked,
-                ROUND(AVG(total_cal)::numeric, 0)       AS avg_total,
-                ROUND(AVG(activity_cal)::numeric, 0)    AS avg_active,
-                ROUND(AVG(resting_cal)::numeric, 0)     AS avg_resting
-            FROM (SELECT * FROM calories ORDER BY day_date DESC LIMIT 30) recent
-            """,
-        ).fetchone()
-    return dict(row) if row else {}
+    """Averages over the last 30 days for the calories stat cards (corrected burn)."""
+    rows = get_calories_days(limit=30)
+    if not rows:
+        return {}
+
+    def avg(key: str) -> int | None:
+        vals = [float(r[key]) for r in rows if r.get(key) is not None]
+        return round(sum(vals) / len(vals)) if vals else None
+
+    return {"days_tracked": len(rows), "avg_total": avg("total_cal"),
+            "avg_active": avg("activity_cal"), "avg_resting": avg("resting_cal")}
 
 
 # ───────────────────────── Nutrition (food) ──────────────────────────────

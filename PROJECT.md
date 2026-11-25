@@ -198,7 +198,8 @@ Tabs:
 - **Food:** form logging from your food library; photo logging via the Claude app.
 - **Goals.**
 - **Calibration:** weight log; checks calorie estimates against real weight change; Katch-McArdle
-  BMR from body-fat %; dynamic TDEE = Garmin burn ÷ BMR.
+  BMR from body-fat %; dynamic TDEE = (formula BMR + Garmin active burn) ÷ BMR. See the
+  calorie correction in §11.
 
 ---
 
@@ -220,6 +221,18 @@ Gotcha: `db.get_recent_activities()` defaults to `LIMIT 200`. Pass a high `limit
 ---
 
 ## 11. Garmin sync: rules learned the hard way
+
+- **Calorie burn correction (2026-11-25).** Garmin's *resting* calories are a flat **1,941
+  kcal/day**, about 330 above the Katch-McArdle BMR (~1,610). Intake minus the weight trend put
+  true maintenance at ~2,827 kcal/day, and Garmin's own total said ~3,150. Formula BMR + Garmin's
+  *active* burn gives ~2,819, so the active burn is trusted and only the resting part is replaced.
+  - `db.get_calories_days()` returns the corrected `resting_cal` and `total_cal`. The originals
+    stay on each row as `garmin_resting_cal` and `garmin_total_cal`.
+  - Every consumer reads the corrected numbers: the energy-balance charts, the Today card,
+    Calibration, the Calories tab, the weekly report and the MCP `recent_calories` tool.
+  - The correction is a ratio, so today's unfinished day stays proportional.
+  - To switch it off: `db.set_setting("calorie_resting_source", "garmin")`. Re-check it every
+    few weeks against the weight trend, since body fat % feeds the BMR.
 
 - **Garmin rate-limits logins, not data calls.** Tokens are cached in `data/garmin_tokens/`.
   Never loop logins.
