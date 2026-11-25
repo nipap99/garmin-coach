@@ -197,7 +197,9 @@ Tabs:
 - **Running / Cycling / Sleep / Calories:** charts, plus sync buttons and CSV import.
 - **Food:** form logging from your food library; photo logging via the Claude app.
 - **Goals.**
-- **Calibration:** weight log; checks calorie estimates against real weight change; Katch-McArdle
+- **Calibration:** weight log; checks calorie estimates against the weight trend (21-day
+  regression with a 95% interval, calories of the matching finished days, today excluded; the
+  verdict is "ok" unless the gap beats the trend's own uncertainty); Katch-McArdle
   BMR from body-fat %; dynamic TDEE = (formula BMR + Garmin active burn) ÷ BMR. See the
   calorie correction in §11.
 

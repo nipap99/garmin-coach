@@ -95,6 +95,74 @@ def _window_avg(wmap: dict[str, float], end: date, n: int = 7):
     return (sum(vals) / len(vals), len(vals)) if vals else (None, 0)
 
 
+def _trend_check(wmap: dict[str, float], nut: dict, cal: dict, today: date):
+    """Does the calorie model explain the weight trend?
+
+    Fixes over the old "7-day average vs the week before" check:
+    - Trend = least-squares slope over the last 21 days (every weigh-in counts, not just two
+      averages), with a 95% interval, so day-to-day wobble (~0.45 kg) is measured, not ignored.
+    - Timing: a morning weight reflects the previous days' eating, so the energy balance is
+      taken for the days from (first weigh-in - 1) to (last weigh-in - 1).
+    - Finished days only: today is never included (its burn and food are still accruing).
+    The verdict is 'ok' unless the gap is bigger than the trend's own uncertainty.
+    Returns None until there are ~8 weigh-ins spread over 10+ days."""
+    start = today - timedelta(days=20)
+    pts = [((date.fromisoformat(k) - today).days, v) for k, v in wmap.items()
+           if start <= date.fromisoformat(k) <= today]
+    if len(pts) < 8 or max(x for x, _ in pts) - min(x for x, _ in pts) < 10:
+        return None
+    n = len(pts)
+    mx = sum(x for x, _ in pts) / n
+    my = sum(y for _, y in pts) / n
+    sxx = sum((x - mx) ** 2 for x, _ in pts)
+    slope = sum((x - mx) * (y - my) for x, y in pts) / sxx          # kg per day
+    sd = (sum((y - (my + slope * (x - mx))) ** 2 for x, y in pts) / (n - 2)) ** 0.5
+    trend_week = slope * 7
+    ci = 2.1 * (sd / sxx ** 0.5) * 7                                # ~95% interval, kg/week
+
+    first = today + timedelta(days=min(x for x, _ in pts))
+    last = today + timedelta(days=max(x for x, _ in pts))
+    span = (last - first).days + 1
+    nets = []
+    for i in range(span):
+        d = first - timedelta(days=1) + timedelta(days=i)           # weigh-in day t reflects t-1
+        if d >= today:
+            continue
+        nrow, crow = nut.get(d.isoformat()), cal.get(d.isoformat())
+        eaten = float(nrow["kcal"]) if nrow and nrow.get("kcal") not in (None, "") else None
+        burned = (float(crow["total_cal"]) if crow and crow.get("total_cal") not in (None, "")
+                  and float(crow["total_cal"]) > 1200 else None)
+        if eaten is not None and burned is not None:
+            nets.append(eaten - burned)
+    if len(nets) < 0.6 * span:
+        return {"status": None, "weigh_ins": n, "covered_days": len(nets), "span_days": span,
+                "verdict": f"Only {len(nets)} of {span} days have both food and burn logged - "
+                           "log more days to run the check."}
+
+    net_avg = sum(nets) / len(nets)
+    predicted_week = net_avg * 7 / KCAL_PER_KG
+    disc = trend_week - predicted_week                              # +ve: lost less than predicted
+    err = round(disc * KCAL_PER_KG / 7)
+    if abs(disc) <= ci:
+        status = "ok"
+        verdict = (f"Your calorie numbers are consistent with your weight trend: the gap is "
+                   f"smaller than the trend's own uncertainty (+/-{ci:.1f} kg/week).")
+    elif disc > 0:
+        status = "over"
+        verdict = (f"The app OVER-estimates your deficit by about {abs(err):,} kcal/day - your "
+                   "weight fell less than your calories predict, so true intake is higher or "
+                   "burn lower than tracked.")
+    else:
+        status = "under"
+        verdict = (f"The app UNDER-estimates your deficit by about {abs(err):,} kcal/day - your "
+                   "weight fell more than your calories predict, so you are eating less or "
+                   "burning more than tracked.")
+    return {"status": status, "verdict": verdict, "weigh_ins": n,
+            "covered_days": len(nets), "span_days": span, "net_avg": round(net_avg),
+            "predicted_week": round(predicted_week, 2), "trend_week": round(trend_week, 2),
+            "ci": round(ci, 2), "discrepancy_week": round(disc, 2), "daily_cal_error": err}
+
+
 @router.get("/balance")
 def weight_balance():
     """7-day-average weight, week-over-week change, and the calorie-model check."""
@@ -114,41 +182,11 @@ def weight_balance():
     prev_avg, prev_n = _window_avg(wmap, today - timedelta(days=7))
     measured = (cur_avg - prev_avg) if (cur_avg is not None and prev_avg is not None) else None
 
-    # calorie model over the current 7 days (complete days only: both sides present
-    # and a full day's burn is always > ~1200 kcal of resting metabolism)
-    nut = {r["log_date"]: r for r in db.get_nutrition_days(limit=40)}
-    cal = {r["day_date"]: r for r in db.get_calories_days(limit=40)}
-    net_sum = 0.0
-    net_days = 0
-    for i in range(7):
-        d = (today - timedelta(days=i)).isoformat()
-        nrow, crow = nut.get(d), cal.get(d)
-        eaten = float(nrow["kcal"]) if nrow and nrow.get("kcal") not in (None, "") else None
-        burned = (float(crow["total_cal"]) if crow and crow.get("total_cal") not in (None, "")
-                  and float(crow["total_cal"]) > 1200 else None)
-        if eaten is not None and burned is not None:
-            net_sum += eaten - burned
-            net_days += 1
-    predicted = (net_sum / KCAL_PER_KG) if net_days else None
-
-    discrepancy = daily_cal_error = verdict = status = None
-    if measured is not None and predicted is not None:
-        discrepancy = measured - predicted               # +ve: lost less / gained more than predicted
-        daily_cal_error = round(discrepancy * KCAL_PER_KG / 7)
-        if abs(discrepancy) <= 0.2:
-            status = "ok"
-            verdict = ("The calorie numbers check out - your real change is within "
-                       "~0.2 kg of what the deficit predicted.")
-        elif discrepancy > 0:
-            status = "over"
-            verdict = (f"The app OVER-estimates your deficit by about {abs(daily_cal_error):,} kcal/day "
-                       "- you lost less (or gained more) than the numbers said, so your true "
-                       "intake is higher or your burn is lower than tracked.")
-        else:
-            status = "under"
-            verdict = (f"The app UNDER-estimates your deficit by about {abs(daily_cal_error):,} kcal/day "
-                       "- you lost more than the numbers said, so you are eating less or "
-                       "burning more than tracked.")
+    # Calorie check: weight TREND (21-day regression) vs the energy balance of the matching
+    # days, finished days only. See _trend_check.
+    nut = {r["log_date"]: r for r in db.get_nutrition_days(limit=60)}
+    cal = {r["day_date"]: r for r in db.get_calories_days(limit=60)}
+    check = _trend_check(wmap, nut, cal, today)
 
     # ── Body composition (Katch-McArdle): LBM = kg x (1 - bf%); BMR = 370 + 21.6 x LBM.
     # Keyed on the 7-day average weight so it moves with the trend, not a noisy daily number.
@@ -162,7 +200,7 @@ def weight_balance():
 
     # Burn: avg of complete days' total_cal over the current 7 days. total_cal is
     # already corrected (formula BMR + Garmin active), see db._correct_resting.
-    g_burns = [float(cal[d]["total_cal"]) for i in range(7)
+    g_burns = [float(cal[d]["total_cal"]) for i in range(1, 8)
                if (d := (today - timedelta(days=i)).isoformat()) in cal
                and cal[d].get("total_cal") not in (None, "")
                and float(cal[d]["total_cal"]) > 1200]
@@ -200,11 +238,6 @@ def weight_balance():
         "prev_avg": round(prev_avg, 2) if prev_avg is not None else None,
         "cur_n": cur_n, "prev_n": prev_n,
         "measured": round(measured, 2) if measured is not None else None,
-        "net_sum": round(net_sum) if net_days else None,
-        "net_days": net_days,
-        "predicted": round(predicted, 2) if predicted is not None else None,
-        "discrepancy": round(discrepancy, 2) if discrepancy is not None else None,
-        "daily_cal_error": daily_cal_error,
-        "status": status, "verdict": verdict,
+        "check": check,
         "series": series,
     }

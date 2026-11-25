@@ -356,13 +356,17 @@ def energy_balance(days: int = Query(14, ge=3, le=120)):
     meaningful then). Burned comes from the Calories table; if a day hasn't been
     synced, ``burned``/``net`` are null so the UI can show 'pending sync' rather
     than a misleading number. ``net_sum`` totals only the days where both exist.
+    Today is left out (unfinished day).
     """
     nut = {r["log_date"]: r for r in db.get_nutrition_days(limit=days)}
     cal = {r["day_date"]: r for r in db.get_calories_days(limit=days + 7)}
 
     out: list[dict] = []
     net_sum = 0
+    today_iso = date.today().isoformat()
     for d in sorted(nut.keys())[-days:]:
+        if d >= today_iso:          # finished days only: today's food and burn are still accruing
+            continue
         eaten = int(nut[d]["kcal"] or 0)
         crow = cal.get(d)
         burned = int(crow["total_cal"]) if crow and crow.get("total_cal") is not None else None

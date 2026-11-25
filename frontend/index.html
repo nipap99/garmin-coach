@@ -1249,17 +1249,19 @@ async function loadWeight(){
     }
   }
 
-  // validation card
-  if (d.verdict && d.measured != null && d.predicted != null){
-    val.className = 'weight-validate ' + (d.status || '');
-    const net = d.net_sum != null ? (d.net_sum>0?'+':'') + d.net_sum.toLocaleString() + ' kcal' : '—';
-    val.innerHTML =
-      `<span class="vt">Calorie check (${d.net_days}/7 complete days)</span>`+
-      `App's 7-day net: <strong>${net}</strong> &rarr; predicts <strong>${(d.predicted>0?'+':'')+d.predicted.toFixed(1)} kg</strong>. `+
-      `You actually changed <strong>${(d.measured>0?'+':'')+d.measured.toFixed(1)} kg</strong>. ${d.verdict}`;
+  // validation card: weight trend (21 days) vs the calories of the matching, finished days
+  const ck = d.check;
+  if (ck && ck.verdict){
+    val.className = 'weight-validate ' + (ck.status || '');
+    const sg = v => (v>0?'+':'') + v.toFixed(2);
+    val.innerHTML = ck.trend_week != null
+      ? `<span class="vt">Calorie check (${ck.covered_days}/${ck.span_days} finished days, ${ck.weigh_ins} weigh-ins)</span>`+
+        `Your calories (avg net <strong>${ck.net_avg>0?'+':''}${ck.net_avg.toLocaleString()} kcal/day</strong>) predict <strong>${sg(ck.predicted_week)} kg/week</strong>. `+
+        `Your weight trend is <strong>${sg(ck.trend_week)} kg/week</strong> (&plusmn;${ck.ci.toFixed(1)}). ${ck.verdict}`
+      : `<span class="vt">Calorie check</span>${ck.verdict}`;
   } else {
     val.className = 'weight-validate';
-    val.innerHTML = `<span class="vt">Calorie check</span>Log weight for ~2 weeks (and keep food + calories synced) to validate the deficit.`;
+    val.innerHTML = `<span class="vt">Calorie check</span>Log weight on ~8 days over 10+ days (and keep food + calories synced) to validate the deficit.`;
   }
 
   // chart: daily weight + 7-day average line
